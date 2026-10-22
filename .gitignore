@@ -1,0 +1,20 @@
+# --- secrets (never commit credentials) ---
+.env
+*.key
+class-endpoints.txt
+
+# --- runtime data: generated songs, DJ clips, uploaded voice references (never commit) ---
+data/
+*.voice.*
+voices/
+
+# --- python ---
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# --- os / editor ---
+.DS_Store
+.idea/
+.vscode/
