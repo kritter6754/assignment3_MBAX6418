@@ -109,3 +109,19 @@ def test_plan_song_parses_fenced_json(tmp_path):
 
 def test_clean_speech_strips_stage_directions():
     assert clean_speech('*laughs* Hey there! 🎵 (pause) That was "Neon Rain".') == 'Hey there! That was "Neon Rain".'
+
+
+def test_unreachable_service_names_the_host(tmp_path):
+    def handler(req):
+        raise httpx.ConnectTimeout("no route", request=req)
+
+    with pytest.raises(ServiceError, match=r"could not connect to img "):
+        svc_with(handler, tmp_path).image("x")
+
+
+def test_status_reports_each_service(tmp_path):
+    def handler(req):
+        return httpx.Response(200 if req.url.host != "tts" else 503, json={})
+
+    st = svc_with(handler, tmp_path).status()
+    assert st["text"]["ok"] and st["music"]["host"] == "music" and not st["speech"]["ok"]

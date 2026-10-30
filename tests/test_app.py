@@ -149,3 +149,8 @@ def test_generated_songs_survive_restart(tmp_path, samples_dir, mock_services):
         job = wait_job(c, c.post("/api/generate", json=SONG).json()["id"])
     with TestClient(create_app(settings, mock_services, samples_dir=samples_dir)) as c:
         assert job["track_id"] in [t["id"] for t in c.get("/api/tracks").json()]
+
+
+def test_status_endpoint_has_no_secrets(client):
+    r = client.get("/api/status")
+    assert r.json()["services"]["text"]["ok"] and SECRET not in r.text

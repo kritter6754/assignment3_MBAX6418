@@ -99,6 +99,13 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
                 "styles": STYLES, "moods": MOODS, "languages": LANGUAGES,
                 "min_duration": MIN_DURATION, "max_duration": MAX_DURATION}
 
+    @app.get("/api/status")
+    def status():
+        """Which class services this server can reach (hosts only, never credentials)."""
+        if not settings.configured:
+            return {"configured": False, "services": {}}
+        return {"configured": True, "services": services.status()}
+
     # -- library & generation ----------------------------------------------
     @app.get("/api/tracks")
     def tracks():

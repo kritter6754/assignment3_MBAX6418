@@ -52,6 +52,7 @@ class Services(Protocol):
     def music(self, caption: str, lyrics: str, duration_s: int, language: str = "en",
               seed: int | None = None) -> Audio: ...
     def speech(self, text: str, voice_path: Path | None = None, language: str = "en") -> Audio: ...
+    def status(self) -> dict[str, dict]: ...
 
 
 def extract_json(text: str) -> Any:
@@ -86,23 +87,28 @@ class ClassServices:
                  poll_interval_s: float = 2.0):
         self.s = settings
         self.poll_interval_s = poll_interval_s
+        # A short connect timeout makes a wrong or unreachable URL fail in seconds, while slow
+        # generations still get the full read timeout.
         self._http = httpx.Client(
-            timeout=settings.timeout_s, transport=transport,
+            timeout=httpx.Timeout(settings.timeout_s, connect=10.0), transport=transport,
             headers={"Authorization": f"Bearer {settings.api_key}"},
         )
 
     # -- plumbing -----------------------------------------------------------
     def _request(self, name: str, method: str, url: str, **kw) -> httpx.Response:
         for attempt in range(3):  # retry dropped connections and 502/503/504 with backoff
+            host = _host(url)
             try:
                 r = self._http.request(method, url, **kw)
+            except httpx.ConnectTimeout:
+                raise ServiceError(f"{name}: could not connect to {host} (check its *_BASE_URL setting)") from None
             except httpx.TimeoutException:
-                raise ServiceError(f"{name}: the request timed out; the service may be busy, retry shortly") from None
+                raise ServiceError(f"{name}: {host} did not answer in time; the service may be busy, retry shortly") from None
             except httpx.HTTPError as e:
                 if attempt < 2:
                     time.sleep(1.5 * (attempt + 1))
                     continue
-                raise ServiceError(f"{name}: could not reach the service ({type(e).__name__})") from None
+                raise ServiceError(f"{name}: could not reach {host} ({type(e).__name__})") from None
             if r.status_code in (502, 503, 504) and attempt < 2:
                 time.sleep(2.0 * (attempt + 1))
                 continue
@@ -115,7 +121,24 @@ class ClassServices:
 
     @staticmethod
     def _url(base: str, path: str) -> str:
-        return base.rstrip("/") + path
+        return base.strip().rstrip("/") + path
+
+    def status(self) -> dict[str, dict]:
+        """Quick reachability check of each service, as seen from this server."""
+        checks = {"text": (self.s.llm_url, "/models"), "image": (self.s.image_url, "/models"),
+                  "music": (self.s.music_url, "/health"), "speech": (self.s.tts_url, "/models")}
+        out = {}
+        for key, (base, path) in checks.items():
+            url = self._url(base, path)
+            t = time.monotonic()
+            try:
+                r = self._http.get(url, timeout=httpx.Timeout(10.0, connect=5.0))
+                ok, detail = r.status_code == 200, f"HTTP {r.status_code}"
+            except httpx.HTTPError as e:
+                ok, detail = False, type(e).__name__
+            out[key] = {"ok": ok, "host": _host(url), "detail": detail,
+                        "ms": round((time.monotonic() - t) * 1000)}
+        return out
 
     # -- Qwen (text) --------------------------------------------------------
     def chat(self, messages: list[dict], schema: dict | None = None,
@@ -219,6 +242,14 @@ class ClassServices:
         return Audio(r.content, _audio_ext(ctype))
 
 
+def _host(url: str) -> str:
+    try:
+        u = httpx.URL(url)
+        return f"{u.host}:{u.port}" if u.port else u.host or url
+    except Exception:  # noqa: BLE001 - only used for messages
+        return repr(url)
+
+
 def _audio_ext(content_type: str, ref: str = "") -> str:
     if "mpeg" in content_type or "mp3" in content_type or ref.lower().endswith(".mp3"):
         return "mp3"
@@ -289,6 +320,10 @@ class MockServices:
     def music(self, caption, lyrics, duration_s, language="en", seed=None) -> Audio:
         self._check("music", caption)
         return Audio(_tone_wav(min(duration_s, 8), caption), "wav")
+
+    def status(self) -> dict[str, dict]:
+        return {k: {"ok": True, "host": "mock", "detail": "mock", "ms": 0}
+                for k in ("text", "image", "music", "speech")}
 
     def speech(self, text, voice_path=None, language="en") -> Audio:
         self._check("speech", text)
