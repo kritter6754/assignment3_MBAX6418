@@ -36,8 +36,11 @@
         <form id="gen-form">
           <div class="row2">
             <label>Style
-              <input id="style" list="style-list" required maxlength="80" placeholder="e.g. Synthwave">
-              <datalist id="style-list"></datalist>
+              <span class="style-field">
+                <select id="style-pick" required></select>
+                <input id="style" maxlength="80" placeholder="Type any style" hidden>
+                <button id="style-back" class="btn small ghost" type="button" title="Back to the style list" aria-label="Back to the style list" hidden>▾</button>
+              </span>
             </label>
             <label>Mood
               <input id="mood" list="mood-list" required maxlength="80" placeholder="e.g. Dreamy">

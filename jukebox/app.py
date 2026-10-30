@@ -26,8 +26,19 @@ from .services import ServiceError, Services, make_services
 log = logging.getLogger("jukebox")
 STATIC = Path(__file__).parent / "static"
 
-STYLES = ["Lo-fi hip hop", "Synthwave", "Indie pop", "Acoustic folk", "Jazz", "Funk",
-          "Rock", "EDM", "Cinematic orchestral", "Reggae", "Country", "R&B"]
+# Style dropdown, in display order. Users can also type any custom style.
+STYLE_GROUPS: dict[str, list[str]] = {
+    "Rock": ["Classic Rock", "Grunge", "Punk Rock", "Indie Rock", "Psychedelic Rock", "Heavy Metal",
+             "Shoegaze", "Pop-Punk"],
+    "Pop & Dance": ["Synth-Pop", "Disco", "Bubblegum Pop", "Hyperpop", "Dream Pop", "Eurodance"],
+    "Soul, Funk & R&B": ["Motown / Northern Soul", "Neo-Soul", "Funk", "Gospel", "Contemporary R&B", "Doo-Wop"],
+    "Hip Hop": ["Boom Bap", "Trap", "Conscious Rap", "G-Funk", "Drill"],
+    "Electronic": ["House", "Techno", "Drum and Bass", "Dubstep", "Ambient", "Trance"],
+    "Country & Folk": ["Bluegrass", "Outlaw Country", "Honky-Tonk", "Traditional Folk", "Americana"],
+    "Blues & Jazz": ["Delta Blues", "Bebop", "Smooth Jazz", "Chicago Blues"],
+    "Latin & Caribbean": ["Bossa Nova", "Reggae", "Salsa", "Reggaeton", "Bachata", "Ska"],
+    "Other": ["Chamber Pop", "Choral / A Cappella", "Flamenco", "Torch Song"],
+}
 MOODS = ["Chill", "Happy", "Melancholic", "Energetic", "Dreamy", "Romantic", "Epic", "Mysterious"]
 
 
@@ -96,7 +107,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     @app.get("/api/config")
     def config():
         return {"configured": settings.configured, "mock": settings.mock,
-                "styles": STYLES, "moods": MOODS, "languages": LANGUAGES,
+                "style_groups": STYLE_GROUPS, "moods": MOODS, "languages": LANGUAGES,
                 "min_duration": MIN_DURATION, "max_duration": MAX_DURATION}
 
     @app.get("/api/status")

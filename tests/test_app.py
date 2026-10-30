@@ -154,3 +154,10 @@ def test_generated_songs_survive_restart(tmp_path, samples_dir, mock_services):
 def test_status_endpoint_has_no_secrets(client):
     r = client.get("/api/status")
     assert r.json()["services"]["text"]["ok"] and SECRET not in r.text
+
+
+def test_style_dropdown_list(client):
+    groups = client.get("/api/config").json()["style_groups"]
+    styles = [s for g in groups.values() for s in g]
+    assert len(styles) == 50 == len(set(styles))
+    assert styles[0] == "Classic Rock" and styles[-1] == "Torch Song"

@@ -7,6 +7,7 @@
 
 const $ = (id) => document.getElementById(id);
 const audio = $("audio");
+const CUSTOM_STYLE = "__custom__";
 const DJ_WAIT_MS = 90_000; // give up on a DJ clip after this long and go straight to the next song
 
 const state = {
@@ -323,6 +324,12 @@ async function submitGenerate(ev) {
   const err = $("gen-error");
   err.hidden = true;
   const vocal = document.querySelector("input[name=kind]:checked").value === "vocal";
+  if (!$("style").value.trim()) {
+    err.textContent = $("style-pick").value === CUSTOM_STYLE ? "Type a style, or press ▾ to pick one from the list." : "Choose a style.";
+    err.hidden = false;
+    ($("style-pick").value === CUSTOM_STYLE ? $("style") : $("style-pick")).focus();
+    return;
+  }
   const body = {
     style: $("style").value.trim(), mood: $("mood").value.trim(), theme: $("theme").value.trim(),
     duration_s: Number($("duration").value), vocal, language: $("language").value,
@@ -444,7 +451,30 @@ async function init() {
     return;
   }
   const c = state.config;
-  for (const s of c.styles) $("style-list").append(el("option", { value: s }));
+  // Style: pick from the dropdown, or choose "Custom" to type anything.
+  const pick = $("style-pick");
+  pick.append(el("option", { value: "", disabled: true, selected: true }, "Choose a style…"));
+  for (const [group, styles] of Object.entries(c.style_groups)) {
+    pick.append(el("optgroup", { label: group }, styles.map((s) => el("option", { value: s }, s))));
+  }
+  pick.append(el("optgroup", { label: "Something else" }, el("option", { value: CUSTOM_STYLE }, "✎ Custom (type your own)")));
+  // The custom text box takes the dropdown's place, so the form keeps its height.
+  const showCustom = (custom) => {
+    pick.hidden = custom;
+    $("style").hidden = $("style-back").hidden = !custom;
+  };
+  pick.addEventListener("change", () => {
+    const custom = pick.value === CUSTOM_STYLE;
+    showCustom(custom);
+    $("style").value = custom ? "" : pick.value;
+    if (custom) $("style").focus();
+  });
+  $("style-back").addEventListener("click", () => {
+    pick.value = "";
+    $("style").value = "";
+    showCustom(false);
+    pick.focus();
+  });
   for (const m of c.moods) $("mood-list").append(el("option", { value: m }));
   for (const [code, name] of Object.entries(c.languages)) $("language").append(el("option", { value: code }, name));
   $("duration").min = c.min_duration;
