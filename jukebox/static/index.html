@@ -14,61 +14,74 @@
   </header>
 
   <main class="layout">
-    <section class="library-panel">
-      <div class="section-head">
-        <h2>Library <span id="track-count" class="muted"></span></h2>
-        <button id="play-all" class="btn primary">▶ Play all</button>
-      </div>
-      <div id="library" class="grid" aria-live="polite"></div>
-    </section>
+    <!-- Left: output (library + generation status). Right: controls. Fits one screen on desktop. -->
+    <div class="output">
+      <section class="card library-panel">
+        <div class="section-head">
+          <h2>Library <span id="track-count" class="muted"></span></h2>
+          <button id="play-all" class="btn primary">▶ Play all</button>
+        </div>
+        <div id="library" class="grid scroll" aria-live="polite"></div>
+      </section>
+
+      <section class="card jobs-panel">
+        <h2>Generation status</h2>
+        <div id="jobs" class="scroll"><p class="muted">No songs in progress.</p></div>
+      </section>
+    </div>
 
     <aside class="side">
       <section class="card">
         <h2>Create a song</h2>
         <form id="gen-form">
-          <label>Style
-            <input id="style" list="style-list" required maxlength="80" placeholder="e.g. Synthwave">
-            <datalist id="style-list"></datalist>
-          </label>
-          <label>Mood
-            <input id="mood" list="mood-list" required maxlength="80" placeholder="e.g. Dreamy">
-            <datalist id="mood-list"></datalist>
-          </label>
+          <div class="row2">
+            <label>Style
+              <input id="style" list="style-list" required maxlength="80" placeholder="e.g. Synthwave">
+              <datalist id="style-list"></datalist>
+            </label>
+            <label>Mood
+              <input id="mood" list="mood-list" required maxlength="80" placeholder="e.g. Dreamy">
+              <datalist id="mood-list"></datalist>
+            </label>
+          </div>
           <label>Theme <span class="muted">(optional)</span>
             <input id="theme" maxlength="300" placeholder="e.g. a midnight drive along the coast">
           </label>
-          <label>Duration: <strong id="duration-out">60 s</strong>
-            <input id="duration" type="range" min="15" max="240" step="5" value="60">
-          </label>
-          <fieldset class="seg">
-            <legend>Track type</legend>
+          <div class="seg" role="radiogroup" aria-label="Track type">
+            <span>Track type</span>
             <label><input type="radio" name="kind" value="vocal" checked> Vocal (AI lyrics)</label>
             <label><input type="radio" name="kind" value="instrumental"> Instrumental</label>
-          </fieldset>
-          <label id="lang-row">Lyrics language
-            <select id="language"></select>
-          </label>
+          </div>
+          <div class="row2">
+            <label>Duration: <strong id="duration-out">60 s</strong>
+              <input id="duration" type="range" min="15" max="240" step="5" value="60">
+            </label>
+            <label id="lang-row">Lyrics language
+              <select id="language"></select>
+            </label>
+          </div>
           <button id="gen-btn" class="btn primary wide" type="submit">✨ Generate song + cover</button>
           <p id="gen-error" class="error" role="alert" hidden></p>
         </form>
       </section>
 
       <section class="card">
-        <h2>Generation status</h2>
-        <div id="jobs"><p class="muted">No songs in progress.</p></div>
-      </section>
-
-      <section class="card">
         <h2>AI DJ</h2>
-        <label class="switch"><input id="dj-on" type="checkbox" checked> DJ commentary between songs</label>
-        <label>DJ name <input id="dj-name" maxlength="40" value="DJ Nova"></label>
+        <div class="dj-row">
+          <label class="switch"><input id="dj-on" type="checkbox" checked> Talk between songs</label>
+          <label class="inline">DJ name <input id="dj-name" maxlength="40" value="DJ Nova"></label>
+        </div>
         <div class="voice">
-          <div>Voice: <strong id="voice-status">Default voice</strong></div>
-          <label class="btn small">Upload MP3/WAV
-            <input id="voice-file" type="file" accept=".mp3,.wav,audio/mpeg,audio/wav" hidden>
-          </label>
-          <button id="voice-clear" class="btn small ghost" hidden>Use default</button>
-          <p class="muted tiny">10–20 s of clear speech works best. Stored only on this server for your session, never shared.</p>
+          <div class="voice-row">
+            <span>Voice: <strong id="voice-status">Default voice</strong></span>
+            <span>
+              <label class="btn small">Upload MP3/WAV
+                <input id="voice-file" type="file" accept=".mp3,.wav,audio/mpeg,audio/wav" hidden>
+              </label>
+              <button id="voice-clear" class="btn small ghost" hidden>Use default</button>
+            </span>
+          </div>
+          <p class="muted tiny">10–20 s of clear speech · private to your session</p>
           <p id="voice-error" class="error" role="alert" hidden></p>
         </div>
       </section>
