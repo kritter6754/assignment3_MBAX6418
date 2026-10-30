@@ -1,0 +1,22 @@
+{
+  "title": "Golden Hour Drive",
+  "summary": "A breezy, upbeat track capturing the electric energy and carefree joy of a summer road trip with close friends as the sun begins to set.",
+  "lyrics": "[Verse]\nWindows down, the heat is rising\nLaughter echoes through the window\nShadows stretch on asphalt lines\nWe’re chasing time, we’re crossing miles\nThe radio plays our favorite song\nRight where we belong\n[Chorus]\nOh, it’s golden hour drive\nNothing left to hide\nJust you and me and the open sky\nLet the worry fly\nYeah, it’s golden hour drive\nSummers ours to find\nIn this moment, everything is fine\n[Verse]\nMaps are lost, we don’t need ‘em\nHearts are full, no need to plead ‘em\nStatic crackles, voices sing\nMaking memories that will cling\nThe air smells like pine and salt\nThis feeling can’t be faulted\n[Chorus]\nOh, it’s golden hour drive\nNothing left to hide\nJust you and me and the open sky\nLet the worry fly\nYeah, it’s golden hour drive\nSummers ours to find\nIn this moment, everything is fine",
+  "caption": "indie pop, sunshine pop, jangly electric guitar, bright piano, lively bass guitar, crisp drum kit, joyful, energetic, nostalgic, upbeat tempo, clear male vocal, 118 bpm",
+  "cover_prompt": "a vintage convertible car driving along a coastal highway at sunset, three silhouetted friends leaning out with arms raised in joy, vibrant orange and pink sky reflecting off the ocean, warm golden lighting, painterly digital art style, soft focus background, high saturation, square composition, square album cover art, no text, no lettering",
+  "style": "Indie pop",
+  "mood": "Happy",
+  "duration_s": 75,
+  "vocal": true,
+  "theme": "road trip with friends at the start of summer",
+  "language": "en",
+  "audio": "audio.mp3",
+  "cover": "cover.jpg",
+  "generated_with": {
+    "text": "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit",
+    "image": "black-forest-labs/FLUX.2-klein-4B",
+    "music": "acestep/acestep-v15-xl-turbo"
+  },
+  "generated_at": "2026-10-29 19:21:38 MDT",
+  "generation_seconds": 12
+}

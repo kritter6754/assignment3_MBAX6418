@@ -125,3 +125,11 @@ def test_status_reports_each_service(tmp_path):
 
     st = svc_with(handler, tmp_path).status()
     assert st["text"]["ok"] and st["music"]["host"] == "music" and not st["speech"]["ok"]
+
+
+def test_bad_request_includes_service_message(tmp_path):
+    def handler(req):
+        return httpx.Response(400, json={"error": {"message": "Input should be 'chatterbox-v3'"}})
+
+    with pytest.raises(ServiceError, match="Input should be 'chatterbox-v3'"):
+        svc_with(handler, tmp_path).speech("hi")

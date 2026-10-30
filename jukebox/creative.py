@@ -128,7 +128,8 @@ def _describe(track: dict) -> str:
 def write_dj_line(svc: Services, prev: dict | None, nxt: dict, dj_name: str = "DJ Nova") -> str:
     """Commentary spoken between `prev` (just finished) and `nxt` (about to play)."""
     if prev is None:
-        situation = f"The show is starting. Introduce the first song:\n{_describe(nxt)}"
+        situation = (f"The show is starting. Introduce the first song:\n{_describe(nxt)}\n\n"
+                     "This is the only song you know about; do not say what plays after it.")
     else:
         situation = (f"Song that just finished:\n{_describe(prev)}\n\n"
                      f"Song that plays next:\n{_describe(nxt)}")
@@ -137,8 +138,9 @@ Write what you say on air between songs.
 
 {situation}
 
-Rules: 2-3 sentences, at most 55 words. Mention the finished song and the next song by title and
-one specific detail of each (its mood, sound, or what it is about). Plain spoken English only:
+Rules: 2-3 sentences, at most 55 words. Mention {"the next song" if prev is None else "the finished song and the next song"} by title
+and one specific detail of each (its mood, sound, or what it is about). Never mention or invent any
+other song title. Plain spoken English only:
 no emojis, no hashtags, no stage directions, no asterisks, no brackets. Output only the words to speak."""
     text = svc.chat([{"role": "user", "content": prompt}], max_tokens=200, temperature=0.9)
     return clean_speech(text) or f"That was {prev['title'] if prev else 'a great start'}. Up next, {nxt['title']}."

@@ -1,0 +1,22 @@
+{
+  "title": "Rainy Pages",
+  "summary": "A soothing instrumental track that captures the cozy solitude of reading in a quiet café while rain gently taps against the windowpane.",
+  "lyrics": "[Instrumental]",
+  "caption": "lo-fi hip hop, chillhop, dusty piano, vinyl crackle, soft jazz drums, muted bass guitar, nostalgic, relaxed, downtempo, instrumental, no vocals, 85 bpm",
+  "cover_prompt": "a cozy interior of a small study café with large windows overlooking a rainy street, warm amber lighting contrasting with cool blue-grey tones outside, stacks of vintage books on wooden tables, condensation on the glass, soft focus background, watercolor texture style, square composition, square album cover art, no text, no lettering",
+  "style": "Lo-fi hip hop",
+  "mood": "Chill",
+  "duration_s": 60,
+  "vocal": false,
+  "theme": "a rainy afternoon in a quiet study café",
+  "language": "en",
+  "audio": "audio.mp3",
+  "cover": "cover.jpg",
+  "generated_with": {
+    "text": "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit",
+    "image": "black-forest-labs/FLUX.2-klein-4B",
+    "music": "acestep/acestep-v15-xl-turbo"
+  },
+  "generated_at": "2026-10-29 19:21:26 MDT",
+  "generation_seconds": 10
+}

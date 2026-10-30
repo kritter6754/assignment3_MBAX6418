@@ -114,6 +114,8 @@ class ClassServices:
                 continue
             if r.status_code >= 400:
                 why = _FRIENDLY.get(r.status_code, f"HTTP {r.status_code}")
+                if r.status_code in (400, 422):  # the service's own explanation is the useful part
+                    why += f" ({_error_message(r)})"
                 log.warning("%s %s -> %s: %s", method, url, r.status_code, r.text[:300])
                 raise ServiceError(redact(f"{name}: {why}"))
             return r
@@ -240,6 +242,19 @@ class ClassServices:
         if ctype.startswith("application/json"):
             raise ServiceError(f"{name}: expected audio but got JSON")
         return Audio(r.content, _audio_ext(ctype))
+
+
+def _error_message(r: httpx.Response) -> str:
+    try:
+        body = r.json()
+    except ValueError:
+        return r.text[:200]
+    err = body.get("error") or body.get("detail") or body
+    if isinstance(err, dict):
+        err = err.get("message") or err
+    if isinstance(err, list):
+        err = "; ".join(str(e.get("msg", e)) if isinstance(e, dict) else str(e) for e in err)
+    return str(err)[:200]
 
 
 def _host(url: str) -> str:

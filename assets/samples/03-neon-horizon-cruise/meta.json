@@ -1,0 +1,22 @@
+{
+  "title": "Neon Horizon Cruise",
+  "summary": "A dreamy synthwave track capturing the solitary euphoria of driving through a glowing, rain-slicked metropolis at midnight.",
+  "lyrics": "[Verse]\nStreetlights bleed into the wet asphalt\nShadows dance as I pass them by\nThe engine hums a steady heartbeat\nUnderneath the endless sky\nReflections swirl in neon hues\nPainting stories on the glass\nI leave the world behind my rearview\nWatching memories fade to black\n\n[Chorus]\nDriving through the neon horizon\nChasing stars that never fade\nIn this electric dream of mine\nNo time has passed or stayed\nJust you and me and the city lights\nGliding through the midnight air\nLost in the glow of tomorrow\nWith nowhere left to go but there\n\n[Bridge]\nThe radar blips in silence now\nThe speedometer spins around\nWe are ghosts in chrome and light\nFloating free without a sound\n\n[Chorus]\nDriving through the neon horizon\nChasing stars that never fade\nIn this electric dream of mine\nNo time has passed or stayed\nJust you and me and the city lights\nGliding through the midnight air\nLost in the glow of tomorrow\nWith nowhere left to go but there",
+  "caption": "synthwave, darkwave, analog synthesizers, heavy bassline, shimmering pads, melodic drums, dreamy, nostalgic, atmospheric, mid-tempo groove, smooth male vocal, 105 bpm",
+  "cover_prompt": "A retro-futuristic perspective from inside a classic sports car looking out onto a rain-slicked highway in a cyberpunk city at night. The dashboard glows with soft orange and purple analog dials. Outside, towering skyscrapers are bathed in vibrant cyan and magenta neon signs, reflecting off the wet pavement and the windshield. Mist rolls along the street level. The art style is painterly digital art with a heavy emphasis on bokeh effects from distant city lights. Color palette features deep indigo, electric blue, hot pink, and warm amber. No text or logos., square album cover art, no text, no lettering",
+  "style": "Synthwave",
+  "mood": "Dreamy",
+  "duration_s": 75,
+  "vocal": true,
+  "theme": "driving through a neon city at midnight",
+  "language": "en",
+  "audio": "audio.mp3",
+  "cover": "cover.jpg",
+  "generated_with": {
+    "text": "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit",
+    "image": "black-forest-labs/FLUX.2-klein-4B",
+    "music": "acestep/acestep-v15-xl-turbo"
+  },
+  "generated_at": "2026-10-29 19:21:49 MDT",
+  "generation_seconds": 12
+}
