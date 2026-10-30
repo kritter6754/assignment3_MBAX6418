@@ -82,9 +82,10 @@ def test_speech_default_and_uploaded_voice(tmp_path):
     ref = tmp_path / "me.wav"
     ref.write_bytes(b"RIFF....WAVEdata")
     svc.speech("hello there", ref)
-    assert seen[0][0] == "/v1/audio/speech" and json.loads(seen[0][2])["input"] == "hello there"
+    body = json.loads(seen[0][2])
+    assert seen[0][0] == "/v1/audio/speech" and body["input"] == "hello there" and body["language_id"] == "en"
     assert seen[1][0] == "/v1/audio/speech/upload" and seen[1][1].startswith("multipart/form-data")
-    assert b'name="voice_file"' in seen[1][2]
+    assert b'name="file"' in seen[1][2] and b'name="request"' in seen[1][2]
 
 
 def test_errors_are_friendly_and_redacted(tmp_path):

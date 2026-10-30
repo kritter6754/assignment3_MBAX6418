@@ -294,6 +294,7 @@ audio.addEventListener("ended", () => {
   else if (state.phase === "dj") startSong(state.pos + 1);
 });
 audio.addEventListener("play", updatePlayButton);
+audio.addEventListener("emptied", () => { $("t-cur").textContent = $("t-dur").textContent = "0:00"; $("seek").value = 0; });
 audio.addEventListener("pause", updatePlayButton);
 audio.addEventListener("error", () => {
   if (!audio.getAttribute("src") || state.phase === "idle" || state.phase === "dj-wait") return;
@@ -329,7 +330,7 @@ async function submitGenerate(ev) {
   $("gen-btn").disabled = true;
   try {
     await api("/api/generate", { method: "POST", json: body });
-    toast("Song generation started. This usually takes a minute or two.", "ok");
+    toast("Song generation started. This usually takes under a minute.", "ok");
     pollJobs();
   } catch (e) {
     err.textContent = e.message;

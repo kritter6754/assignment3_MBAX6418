@@ -33,7 +33,7 @@ class _RedactFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         record.msg = redact(str(record.msg))
         if record.args:
-            record.args = tuple(redact(str(a)) for a in record.args)
+            record.args = tuple(redact(a) if isinstance(a, str) else a for a in record.args)
         return True
 
 
@@ -84,9 +84,9 @@ def load_settings(env_file: str | os.PathLike | None = None) -> Settings:
         image_url=e("IMAGE_BASE_URL", ""),
         image_model=e("IMAGE_MODEL", "black-forest-labs/FLUX.2-klein-4B"),
         music_url=e("MUSIC_BASE_URL", ""),
-        music_model=e("MUSIC_MODEL", "ACE-Step-1.5-XL-Turbo"),
+        music_model=e("MUSIC_MODEL", "acestep/acestep-v15-xl-turbo"),
         tts_url=e("TTS_BASE_URL", ""),
-        tts_model=e("TTS_MODEL", "chatterbox-multilingual"),
+        tts_model=e("TTS_MODEL", "chatterbox-v3"),
         data_dir=data_dir,
         app_password=e("APP_PASSWORD", ""),
         mock=_flag(e("MOCK_SERVICES")),

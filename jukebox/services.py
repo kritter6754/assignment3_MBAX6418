@@ -202,15 +202,17 @@ class ClassServices:
     # -- Chatterbox (DJ speech) ---------------------------------------------
     def speech(self, text: str, voice_path: Path | None = None, language: str = "en") -> Audio:
         name = "DJ voice service (Chatterbox)"
-        fields = {"model": self.s.tts_model, "input": text, "language": language,
-                  "response_format": "wav"}
+        req = {"model": self.s.tts_model, "input": text, "language_id": language,
+               "response_format": "mp3"}
         if voice_path is None:
-            r = self._request(name, "POST", self._url(self.s.tts_url, "/audio/speech"), json=fields)
+            r = self._request(name, "POST", self._url(self.s.tts_url, "/audio/speech"), json=req)
         else:
+            # Reference recording goes as the multipart "file"; the speech settings as a JSON string.
             mime = "audio/mpeg" if voice_path.suffix.lower() == ".mp3" else "audio/wav"
             with voice_path.open("rb") as f:
                 r = self._request(name, "POST", self._url(self.s.tts_url, "/audio/speech/upload"),
-                                  data=fields, files={"voice_file": (voice_path.name, f, mime)})
+                                  data={"request": json.dumps(req)},
+                                  files={"file": (voice_path.name, f, mime)})
         ctype = r.headers.get("content-type", "")
         if ctype.startswith("application/json"):
             raise ServiceError(f"{name}: expected audio but got JSON")
