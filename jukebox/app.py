@@ -6,13 +6,14 @@ song metadata and media URLs, never credentials or service URLs.
 from __future__ import annotations
 
 import base64
+import hashlib
 import logging
 import os
 import secrets
 from pathlib import Path
 
 from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -57,6 +58,16 @@ class DJBody(BaseModel):
     dj_name: str = Field(default="DJ Nova", max_length=40)
 
 
+def _versioned_index() -> str:
+    """index.html with ?v=<content hash> on its script and stylesheet, so a browser never pairs a
+    new page with an old cached app.js (which left the style dropdown empty after a deploy)."""
+    html = (STATIC / "index.html").read_text()
+    for name in ("app.js", "style.css"):
+        digest = hashlib.sha1((STATIC / name).read_bytes()).hexdigest()[:10]
+        html = html.replace(f"/static/{name}", f"/static/{name}?v={digest}")
+    return html
+
+
 def create_app(settings: Settings | None = None, services: Services | None = None,
                samples_dir: Path | None = None) -> FastAPI:
     settings = settings or load_settings()
@@ -68,6 +79,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     dj = DJ(services, library, voices, data_dir)
 
     app = FastAPI(title="AI Jukebox", docs_url=None, redoc_url=None)
+    index_html = _versioned_index()
     app.state.jobs, app.state.library = jobs, library
 
     if settings.app_password:
@@ -98,7 +110,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     # -- pages & health ----------------------------------------------------
     @app.get("/", include_in_schema=False)
     def index():
-        return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
+        return HTMLResponse(index_html, headers={"Cache-Control": "no-cache"})
 
     @app.get("/healthz")
     def healthz():

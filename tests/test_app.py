@@ -161,3 +161,9 @@ def test_style_dropdown_list(client):
     styles = [s for g in groups.values() for s in g]
     assert len(styles) == 50 == len(set(styles))
     assert styles[0] == "Classic Rock" and styles[-1] == "Torch Song"
+
+
+def test_index_versions_static_assets(client):
+    html = client.get("/").text
+    assert "/static/app.js?v=" in html and "/static/style.css?v=" in html
+    assert client.get("/").headers["cache-control"] == "no-cache"
