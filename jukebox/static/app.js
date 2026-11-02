@@ -269,6 +269,112 @@ function showLyrics(t) {
   $("lyrics-dlg").showModal();
 }
 
+// ---------- live lyrics ----------
+// ACE-Step returns no timing data, so line times are ESTIMATED: the song's real length is shared
+// between an intro, each lyric line (longer lines get more time), short breaks between sections,
+// and an outro. Clicking a line seeks there, which doubles as a manual resync.
+const lyricsState = { trackId: null, lines: [], current: -1 };
+
+function parseLyrics(text) {
+  const items = [];
+  for (const raw of (text || "").split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const tag = line.match(/^\[(.+)\]$/);
+    items.push(tag ? { tag: tag[1] } : { text: line });
+  }
+  return items;
+}
+
+function syllables(line) {
+  return Math.max(1, (line.toLowerCase().match(/[aeiouy]+/g) || []).length);
+}
+
+function timeLyrics(items, duration) {
+  const lines = items.filter((x) => x.text);
+  if (!lines.length || !isFinite(duration) || duration <= 0) return;
+  const avg = lines.reduce((n, l) => n + syllables(l.text), 0) / lines.length;
+  const INTRO = 1.6, OUTRO = 1.2, BREAK = 0.7; // in "average line" units
+  let units = INTRO + OUTRO;
+  let sawLine = false;
+  for (const it of items) {
+    if (it.tag) { if (sawLine) units += BREAK; continue; }
+    it.weight = 0.55 + 0.45 * (syllables(it.text) / avg);
+    units += it.weight;
+    sawLine = true;
+  }
+  const unit = duration / units;
+  let t = INTRO * unit;
+  sawLine = false;
+  for (const it of items) {
+    if (it.tag) { if (sawLine) t += BREAK * unit; continue; }
+    it.start = t;
+    t += it.weight * unit;
+    sawLine = true;
+  }
+}
+
+function showLyricsMessage(node) {
+  lyricsState.trackId = null;
+  lyricsState.lines = [];
+  lyricsState.current = -1;
+  $("lyrics-note").hidden = true;
+  $("lyrics-live").replaceChildren(node);
+}
+
+function showSongLyrics(t) {
+  if (!t.vocal) {
+    showLyricsMessage(el("p", { class: "muted" }, `♪ “${t.title}” is instrumental — no lyrics.`));
+    return;
+  }
+  const items = parseLyrics(t.lyrics);
+  lyricsState.trackId = t.id;
+  lyricsState.lines = items;
+  lyricsState.current = -1;
+  $("lyrics-note").hidden = false;
+  $("lyrics-live").replaceChildren(...items.map((it) => it.tag
+    ? el("div", { class: "ly-tag" }, it.tag)
+    : (it.node = el("div", { class: "ly-line", onclick: () => seekToLine(it) }, it.text))));
+  $("lyrics-live").scrollTop = 0;
+  // Provisional times from the song's requested length; refined from the real audio on loadedmetadata.
+  timeLyrics(items, t.duration_s || 0);
+}
+
+function showDJLyrics(script) {
+  showLyricsMessage(el("div", { class: "ly-dj" }, el("b", {}, `🎙 ${djName()}`), script));
+}
+
+function seekToLine(it) {
+  if (it.start == null || state.phase !== "song") return;
+  audio.currentTime = Math.max(0, it.start - 0.2);
+  if (audio.paused) audio.play().catch(() => {});
+}
+
+function updateLyricsHighlight() {
+  const lines = lyricsState.lines.filter((x) => x.text && x.start != null);
+  if (!lines.length || state.phase !== "song") return;
+  let idx = -1;
+  for (let i = 0; i < lines.length; i++) if (audio.currentTime >= lines[i].start) idx = i;
+  if (idx === lyricsState.current) return;
+  lyricsState.current = idx;
+  lines.forEach((l, i) => {
+    l.node.classList.toggle("now", i === idx);
+    l.node.classList.toggle("past", i < idx);
+  });
+  const box = $("lyrics-live");
+  const target = idx >= 0 ? lines[idx].node : null;
+  // Keep the current line about a third of the way down the box (scroll the box, never the page).
+  box.scrollTop = target ? Math.max(0, target.offsetTop - box.clientHeight / 3) : 0; // .lyrics-live is the offsetParent
+}
+
+audio.addEventListener("loadedmetadata", () => {
+  if (state.phase === "song" && lyricsState.trackId === state.queue[state.pos]) {
+    timeLyrics(lyricsState.lines, audio.duration);
+    lyricsState.current = -1;
+    updateLyricsHighlight();
+  }
+});
+
 // ---------- queue & playback ----------
 function enqueue(id) {
   state.queue.push(id);
@@ -324,6 +430,7 @@ function startSong(index) {
   state.pos = index;
   state.phase = "song";
   setNowPlaying(t.title, `${t.style} · ${t.mood}${t.source === "sample" ? " · sample" : ""}`, t.cover_url, false);
+  showSongLyrics(t);
   renderQueue();
   renderLibrary();
   playSrc(t.audio_url, token).catch(() => {
@@ -374,6 +481,7 @@ async function playDJ() {
     if (clip.warning) toast(clip.warning, "err", 9000);
     state.phase = "dj";
     setNowPlaying(`🎙 ${djName()}`, clip.script, next.cover_url, true);
+    showDJLyrics(clip.script);
     await playSrc(clip.audio_url, token);
   } catch (e) {
     if (token !== state.token) return;
@@ -388,6 +496,7 @@ function stopQueue(finished = false) {
   audio.pause();
   setNowPlaying(finished ? "Queue finished" : "Nothing playing",
     finished ? "Queue more songs or press Play all" : "Press play to start the library", null, false);
+  showLyricsMessage(el("p", { class: "muted" }, "Lyrics appear here while a song plays."));
   updatePlayButton();
   renderQueue();
   renderLibrary();
@@ -481,7 +590,9 @@ audio.addEventListener("timeupdate", () => {
   $("t-cur").textContent = fmt(audio.currentTime);
   $("t-dur").textContent = fmt(audio.duration);
   if (!seeking && audio.duration) $("seek").value = Math.round((audio.currentTime / audio.duration) * 1000);
+  updateLyricsHighlight();
 });
+audio.addEventListener("seeked", updateLyricsHighlight);
 let seeking = false;
 $("seek").addEventListener("input", () => { seeking = true; });
 $("seek").addEventListener("change", () => {

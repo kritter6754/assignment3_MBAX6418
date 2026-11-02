@@ -46,6 +46,7 @@ h3 { margin: 0 0 .25rem; }
   .library-panel { flex: 1 1 auto; min-height: 0; }
   .jobs-panel { flex: 0 1 auto; max-height: 32%; min-height: 0; }
   .side { overflow: auto; }
+  .lyrics-card { flex: 1 1 0; min-height: 150px; }
 }
 @media (max-width: 900px) {
   body { padding-bottom: 110px; }
@@ -169,3 +170,20 @@ dialog pre { white-space: pre-wrap; font: inherit; max-height: 55vh; overflow: a
 .pick-list img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; }
 .pick-list .sub { color: var(--muted); font-size: .8rem; }
 .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+/* live lyrics */
+.lyrics-card { display: flex; flex-direction: column; }
+.lyrics-card .section-head { margin-bottom: .4rem; }
+.lyrics-card .tiny { margin: 0; }
+.lyrics-live { flex: 1; min-height: 0; position: relative; scroll-behavior: smooth; padding-right: 4px; }
+@media (max-width: 900px) { .lyrics-live { max-height: 260px; } }
+.lyrics-live .ly-tag { color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .8px; margin: 10px 0 2px; }
+.lyrics-live .ly-line { font-size: 1.02rem; font-weight: 700; line-height: 1.35; padding: 3px 6px; margin: 0 -6px; border-radius: 6px;
+  color: #6f6890; cursor: pointer; transition: color .25s, transform .25s; transform-origin: left center; }
+.lyrics-live .ly-line:hover { background: var(--panel-2); }
+.lyrics-live .ly-line.past { color: #a39cbc; }
+.lyrics-live .ly-line.now { color: var(--text); transform: scale(1.04); }
+.lyrics-live .ly-line.now::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); margin: 0 8px 2px 0; vertical-align: middle; }
+.lyrics-live .ly-dj { font-weight: 600; line-height: 1.45; }
+.lyrics-live .ly-dj b { color: var(--accent-2); display: block; margin-bottom: 4px; }
