@@ -12,7 +12,7 @@ library with an AI DJ who talks between tracks. All of it runs on the class serv
 
 No paid services are used, and port 9000 is not used.
 
-> **Status:** work in progress. Sections marked _TODO_ are filled in from real tests against the class endpoints.
+> **Status:** sections marked _TODO_ are still being filled in from tests against the class endpoints.
 
 ## How it works
 
@@ -35,68 +35,109 @@ Voice upload ─────────── POST /api/voice ─▶ DATA_DIR/v
 - **Commentary is ready on time:** the DJ clip for the next transition is requested as soon as a song starts.
 - **Credentials stay server-side:** the API key and service URLs never reach the browser, and `redact()` scrubs the key from logs and error messages.
 
-## Setup
+## Setup (run it on your own computer)
 
-**Requirements:** Python 3.12 and [uv](https://docs.astral.sh/uv/). No other system software is needed (no ffmpeg). Docker is optional.
+**You need:** Python 3.12 or newer, and internet access to the class services. [uv](https://docs.astral.sh/uv/) is recommended, but plain `pip` also works. No other software is needed (no ffmpeg, no Node, no Docker).
 
-```bash
-uv sync                      # installs dependencies from uv.lock
-cp .env.example .env         # then edit .env (git-ignored) with the class credentials
-uv run ai-jukebox            # http://127.0.0.1:8000
-```
+### 1. Get the code
 
-`.env` settings (placeholders only; take the real values from `class-endpoints.txt`):
+Download the ZIP from GitHub and extract it, or `git clone` the repository. Open a terminal **in the extracted folder** (the one containing `README.md`).
+
+### 2. Supply the class credentials
+
+The app reads credentials only on the server side. Your browser never sees them.
+
+1. Copy the example settings file:
+   - macOS/Linux: `cp .env.example .env`
+   - Windows: `copy .env.example .env`
+2. Open `.env` in a text editor and set `CLASS_API_KEY=` to the class key.
+3. Give the app the four service URLs. Either:
+   - **easiest:** put the class's `class-endpoints.txt` into this folder. The app reads the Qwen (9001), FLUX (9006), ACE-Step (9007) and Chatterbox (9008) URLs from it, or
+   - fill in `LLM_BASE_URL`, `IMAGE_BASE_URL`, `MUSIC_BASE_URL` and `TTS_BASE_URL` in `.env`.
+
+URLs work with or without a trailing `/v1`, and spaces around them are ignored. Values in `.env` take priority over `class-endpoints.txt`. Unedited `example.com` placeholders count as "not set", so they never hide the real URLs. Both `.env` and `class-endpoints.txt` are git-ignored.
+
+Example `.env` (placeholders, not real values):
 
 ```ini
 CLASS_API_KEY=replace-me
+# Only needed if class-endpoints.txt is not in the folder:
 LLM_BASE_URL=http://example.com:9001/v1
 IMAGE_BASE_URL=http://example.com:9006/v1
 MUSIC_BASE_URL=http://example.com:9007
 TTS_BASE_URL=http://example.com:9008/v1
-DATA_DIR=data
-APP_PASSWORD=              # optional: password-protect a public deployment
-MOCK_SERVICES=false        # true = offline fakes for UI development only
 ```
 
-If the credentials are missing, the app still starts and plays the sample songs. A red banner then explains that generation and the DJ are switched off.
+### 3. Install and start
 
-### Deploying on Railway
-
-1. Create a Railway project from this GitHub repo. Railway builds it from the `Dockerfile` (see `railway.json`), with health check `/healthz`.
-2. Under **Variables**, add `CLASS_API_KEY`, `LLM_BASE_URL`, `IMAGE_BASE_URL`, `MUSIC_BASE_URL` and `TTS_BASE_URL`, and optionally `APP_PASSWORD`. Never put them in the repo.
-3. Optional: attach a volume at `/data`, so generated songs survive redeploys. Without one, they last until the container restarts.
-
-### Running with Docker
+With uv:
 
 ```bash
-docker build -t ai-jukebox . && docker run --env-file .env -p 8080:8080 ai-jukebox
+uv sync              # installs the exact dependency versions from uv.lock
+uv run ai-jukebox    # starts the app
 ```
 
-## Using the three core features
+Without uv:
 
-1. **Custom song generation:**
-   - In **Create a song**, pick or type a style and a mood.
-   - Optionally add a theme, then set the duration (15–240 s).
-   - Choose **Vocal** (Qwen writes the lyrics; you choose their language) or **Instrumental**.
-   - Click **Generate**. The **Generation status** panel shows each step: writing (Qwen), cover (FLUX), music (ACE-Step).
-   - When the song is done, it appears in the library marked **NEW**.
-2. **Matching cover art:** each new song gets its own FLUX cover, drawn from a prompt Qwen writes using the song's theme, style and mood. The cover appears on the song's library card and in the player.
-3. **AI DJ:**
-   - Press **Play all**, or queue two or more songs.
-   - Between songs, the DJ (Qwen script, Chatterbox voice) talks about the song that just ended and the one coming up. The script is shown in the player.
-   - To change the DJ's voice, upload an MP3 or WAV recording (10–20 s of clear speech) under **AI DJ**. **Use default** switches back to the default voice.
-   - The DJ checkbox turns commentary off.
+```bash
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python -m jukebox                  # starts the app
+```
 
-**Controls:**
+Then open **http://localhost:8000**. On startup, the terminal checks each class service:
 
-- **Play/pause:** the button, or the space bar.
-- **Skip:** during a song, moves on to the DJ break and then the next song. During the DJ, skips straight to the next song.
-- **Queue panel:** shows what is up next and lets you remove songs.
+```
+INFO jukebox: Checking the class services...
+INFO jukebox:   OK    Qwen (text)            dobolyi.com:9001 (170 ms)
+INFO jukebox:   OK    FLUX (cover art)       dobolyi.com:9006 (130 ms)
+INFO jukebox:   OK    ACE-Step (music)       dobolyi.com:9007 (120 ms)
+INFO jukebox:   OK    Chatterbox (DJ voice)  dobolyi.com:9008 (130 ms)
+```
+
+Stop the app with **Ctrl+C**. Songs, covers and playlists you create are saved in the `data/` folder and are still there the next time you start the app. To start fresh, stop the app and delete `data/`. The three sample songs are never deleted.
+
+### Troubleshooting
+
+| What you see | What to do |
+|---|---|
+| Red banner "Class-service credentials missing" | `CLASS_API_KEY` or a service URL is not set. Check `.env`, or that `class-endpoints.txt` is in the same folder as `README.md`. Restart the app after editing. |
+| `FAIL` lines in the startup check | That service's URL is wrong or the service is down. The line names the host it tried. **http://localhost:8000/api/status** shows the same check. |
+| "address already in use" | Another program is using port 8000. Start with another port: `PORT=8001 uv run ai-jukebox` (Windows: `set PORT=8001` first). |
+| Generation fails with "rejected our credentials" | The key is wrong or expired. |
+| A song or DJ break fails | The message says which service failed. Press **Retry** (generation), or playback simply continues (DJ). The class services are shared, so a busy moment can cause a timeout. |
+
+### Optional: Docker or Railway
+
+Docker: `docker build -t ai-jukebox . && docker run --env-file .env -p 8080:8080 ai-jukebox`, then open http://localhost:8080. The team also used a Railway deployment (`railway.json`, built from the `Dockerfile`) to share the app. It needs the same variables, set as Railway **Variables**. Without a volume at `/data`, generated songs reset on every redeploy.
+
+## Using the app
+
+**1. Custom song generation** (Create a song, right column):
+- Pick a **style** from the dropdown (50 genres in 9 groups), or choose **Custom** to type any style.
+- Type a **mood**, and optionally a **theme**.
+- Choose **Vocal** (Qwen writes original lyrics in the language you pick) or **Instrumental**, and set the **duration** (15–240 s).
+- Click **Generate song + cover**. **Generation status** shows each step: lyrics (Qwen), cover (FLUX), music (ACE-Step). A 60-second song usually takes 10–20 seconds.
+- The finished song appears in the library marked **NEW**.
+
+**2. Matching cover art:** every new song gets its own FLUX cover, painted from a prompt Qwen writes from the song's theme, style and mood. The cover appears on the song's card, in the player, and in the playlist pickers.
+
+**3. Integrated AI DJ:**
+- Press **▶ Play all**, or queue two or more songs.
+- Between songs, the DJ talks about the song that just ended and the one coming up: Qwen writes the script and Chatterbox speaks it. The script appears in the player and in the Lyrics card.
+- To give the DJ a different voice, upload an MP3 or WAV recording (10–20 s of clear speech) under **AI DJ**. **Use default** switches back.
+- Untick **Talk between songs** to turn the DJ off. **DJ name** changes what the DJ calls itself.
+
+**Player and library:**
+- **⏮ / ▶⏸ / ⏭:** rewind restarts the song, or goes to the previous song if pressed in its first 3 seconds. Play/pause also works with the space bar. Skip goes to the DJ break, then the next song.
+- **Card buttons:** the ▶ on a song card turns into ⏸ while that song plays. Cards also have **+ Queue**, **Lyrics/Details**, and 🗂 (add to playlist).
+- **Playlists:** **+ Create Playlist** makes a named folder and lets you pick its songs. The chips above the library switch between **All songs** and each playlist, and **▶ Play all** plays what is shown. **✎ Edit** renames a playlist or changes its songs, and **🗑 Delete** removes it (the songs stay in the library).
+- **Lyrics card:** follows the playing song and highlights the current line. Click any line to jump there. ACE-Step returns no timing data, so line times are **estimated** from the song's length (see Design judgment).
 
 **Recovering from errors:**
-
-- **Failed generation:** the job shows a plain-language error and a **Retry** button. A retry resumes at the failed step and keeps the parts that already succeeded (for example, a finished cover is not regenerated).
-- **DJ failure or timeout:** a toast explains what went wrong and playback moves on to the next song.
+- **Failed generation:** the job shows a plain-language error and a **Retry** button. A retry resumes at the failed step and keeps the parts that already succeeded (a finished cover is not regenerated).
+- **DJ failure or timeout:** a message explains it, and playback continues with the next song.
 - **Unusable voice upload:** the DJ falls back to the default voice and says so.
 
 ## Sample songs
@@ -115,15 +156,21 @@ uv run python scripts/generate_samples.py          # needs .env; skips samples t
 uv run python scripts/generate_samples.py --force  # regenerate all three
 ```
 
-_TODO: describe the three samples (titles, why these styles) once they are generated._
+| # | Title | Style / mood | Type | Length | Theme given |
+|---|---|---|---|---|---|
+| 1 | Rainy Pages | Lo-fi hip hop / Chill | instrumental | 1:00 | a rainy afternoon in a quiet study café |
+| 2 | Golden Hour Drive | Indie pop / Happy | vocal (AI lyrics) | 1:15 | road trip with friends at the start of summer |
+| 3 | Neon Horizon Cruise | Synthwave / Dreamy | vocal (AI lyrics) | 1:15 | driving through a neon city at midnight |
+
+The three cover one instrumental and two vocal tracks in different styles, so the DJ, the lyrics card and the playlists all have something to show right after install. Each took 10–12 s to generate.
 
 ## Tests
 
 ```bash
-uv run pytest        # 22 offline tests: API, job retry, DJ caching, voice validation, request formats
+uv run pytest    # offline: API, retry, DJ caching, voice checks, playlists, settings, request formats
 ```
 
-The automated tests use mocked services. The request formats in `jukebox/services.py` still have to be confirmed against the live class endpoints.
+The automated tests replace the class services with mocks, so they run without network or credentials. The request formats in `jukebox/services.py` were checked against each service's published API description (`/openapi.json`) and against live calls.
 
 ### Test results
 
@@ -149,7 +196,7 @@ _TODO: add to `docs/screenshots/` and link them here (library, generation status
 
 ## Safeguards
 
-- **Credentials:** read from environment variables on the server only. `.env` and `class-endpoints.txt` are git-ignored and excluded from Docker builds.
+- **Credentials:** read on the server only (from `.env`, environment variables or `class-endpoints.txt`), never sent to the browser, and scrubbed from logs and error messages. `.env` and `class-endpoints.txt` are git-ignored and excluded from Docker builds.
 - **Generated songs, DJ clips and voice uploads:** stored under `data/`, which is git-ignored. Each voice recording belongs to one browser session, is never served to any browser, and is deleted by **Use default**.
 
 ## Project layout
@@ -161,6 +208,7 @@ jukebox/creative.py    Qwen prompts: song plan and DJ script
 jukebox/jobs.py        background generation with per-step status and retry
 jukebox/dj.py          DJ clips (cached, deduplicated) and voice uploads
 jukebox/library.py     samples + generated songs
+jukebox/playlists.py   playlists (library folders), saved in DATA_DIR
 jukebox/static/        single-page player (HTML/CSS/JS, no build step)
 scripts/               sample generation
 tests/                 pytest suite

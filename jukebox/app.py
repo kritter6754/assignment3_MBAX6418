@@ -258,18 +258,43 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     return app
 
 
+def _report_services(services: Services) -> None:
+    """Startup self-check printed to the terminal, so setup problems show up before the first click."""
+    names = {"text": "Qwen (text)", "image": "FLUX (cover art)", "music": "ACE-Step (music)",
+             "speech": "Chatterbox (DJ voice)"}
+    try:
+        results = services.status()
+    except Exception as e:  # noqa: BLE001 - a failed check must never stop the app
+        log.warning("Service check failed: %s", e)
+        return
+    for key, r in results.items():
+        if r["ok"]:
+            log.info("  OK    %-22s %s (%d ms)", names[key], r["host"], r["ms"])
+        else:
+            log.warning("  FAIL  %-22s %s: %s (check its *_BASE_URL)", names[key], r["host"], r["detail"])
+
+
 def main() -> None:
+    import threading
+
     import uvicorn
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     install_log_redaction()
     settings = load_settings()
+    host, port = os.environ.get("HOST", "127.0.0.1"), int(os.environ.get("PORT", "8000"))
+    services = make_services(settings)
     if settings.mock:
         log.warning("MOCK_SERVICES=true: songs, covers and DJ speech are FAKE placeholders.")
     elif not settings.configured:
-        log.warning("Class-service credentials are missing: sample songs play, generation and the DJ are disabled.")
-    uvicorn.run(create_app(settings), host=os.environ.get("HOST", "127.0.0.1"),
-                port=int(os.environ.get("PORT", "8000")), log_level="info")
+        log.warning("Class-service settings are missing (CLASS_API_KEY and the four service URLs; see README). "
+                    "Sample songs play, but generation and the DJ are disabled.")
+    else:
+        log.info("Checking the class services...")
+        threading.Thread(target=_report_services, args=(services,), daemon=True).start()
+    log.info("AI Jukebox: open http://%s:%d in your browser (Ctrl+C to stop)",
+             "localhost" if host in ("127.0.0.1", "0.0.0.0") else host, port)
+    uvicorn.run(create_app(settings, services), host=host, port=port, log_level="info")
 
 
 if __name__ == "__main__":
