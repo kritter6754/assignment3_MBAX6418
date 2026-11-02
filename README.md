@@ -126,7 +126,7 @@ Then open http://localhost:8080. The `-v` option keeps generated songs and playl
 - Pick a **style** from the dropdown (50 genres in 9 groups), or choose **Custom** to type any style.
 - Type a **mood**, and optionally a **theme**.
 - Choose **Vocal** (Qwen writes original lyrics in the language you pick) or **Instrumental**, and set the **duration** (15–240 s).
-- Click **Generate song + cover**. **Generation status** shows each step: lyrics (Qwen), cover (FLUX), music (ACE-Step). A 60-second song usually takes 10–20 seconds.
+- Click **Generate song + cover**. **Generation status** shows each step: lyrics (Qwen), cover (FLUX), music (ACE-Step). With the class services not busy, a song of up to 60 s takes about 8–10 s, and a 240 s song about 15–22 s (see [Generation speed](#generation-speed-measured)). Songs are made two at a time, and others wait in a queue.
 - The finished song appears in the library marked **NEW**.
 
 **2. Matching cover art:** every new song gets its own FLUX cover, painted from a prompt Qwen writes from the song's theme, style and mood. The cover appears on the song's card, in the player, and in the playlist pickers.
@@ -170,7 +170,7 @@ uv run python scripts/generate_samples.py --force  # regenerate all three
 | 2 | Golden Hour Drive | Indie pop / Happy | vocal (AI lyrics) | 1:15 | road trip with friends at the start of summer |
 | 3 | Neon Horizon Cruise | Synthwave / Dreamy | vocal (AI lyrics) | 1:15 | driving through a neon city at midnight |
 
-The three cover one instrumental and two vocal tracks in different styles, so the DJ, the lyrics card and the playlists all have something to show right after install. Each took 10–12 s to generate.
+The three cover one instrumental and two vocal tracks in different styles, so the DJ, the lyrics card and the playlists all have something to show right after install. `scripts/generate_samples.py` took 10–12 s per sample.
 
 ## Tests
 
@@ -218,6 +218,109 @@ The automated tests replace the class services with mocks, so they run without n
 - Several people using one copy of the app at once.
 - Windows. All tests ran on macOS.
 - A teammate installing from the ZIP on their own computer (still to be done).
+
+### Generation speed (measured)
+
+We timed the app on 2026-11-01 against the live class services, one song at a time (`scripts/timing_benchmark.py`). The times are from pressing Generate until the app reported each step finished. The cover and the music are made at the same time, so the total is the later of the two.
+
+| Song length | Type | Lyrics + plan (Qwen) | Cover done (FLUX) | Music done (ACE-Step) = total |
+|---|---|---|---|---|
+| 15 s | vocal | 1.5 s | 3.5 s | **8.3 s** |
+| 30 s | vocal | 1.9 s | 3.9 s | **8.6 s** |
+| 60 s | vocal | 2.5 s | 5.0 s | **9.5 s** |
+| 60 s | instrumental | 1.2 s | 3.5 s | **8.5 s** |
+| 90 s | vocal | 2.7 s | 5.0 s | **12.8 s** |
+| 120 s | vocal | 3.4 s | 7.5 s | **13.1 s** |
+| 180 s | vocal | 2.8 s | 6.0 s | **14.1 s** |
+| 240 s | vocal | 3.5 s | 6.1 s | **22.0 s** |
+| 240 s | instrumental | 1.2 s | 3.7 s | **14.7 s** |
+
+- Music is the slowest step and grows with song length. Lyrics take longer for vocal songs because Qwen writes them; for instrumentals it only plans the title, music description and cover.
+- The app checks on ACE-Step every 2 s, so music times are rounded up by up to 2 s.
+- These numbers are for a moment when the class services were not busy. The class services are shared, and at the start of the stress test below the first songs took up to 45 s.
+
+### Stress test: 40 songs at once
+
+On 2026-11-01 we submitted **40 songs at once** to a fresh install from the GitHub ZIP:
+- **Genres:** 5 genres × 8 songs.
+- **Lengths:** 90, 95, 100, 105, 110, 120, 135 or 150 s.
+- **Mix:** 24 vocal and 16 instrumental.
+- **Variety:** different moods and themes.
+
+The app generates two songs at a time and queues the rest. Script: `scripts/stress_test.py`. Full write-up: [docs/stress-test.md](docs/stress-test.md).
+
+| Check | Result |
+|---|---|
+| Songs finished | **40 / 40**, none failed, no retries |
+| Total time | **476 s (7.9 min)**. After a slow start, a song finished about every 6–9 s. |
+| Audio length | All **≥ 90 s** (90.0–150.0 s), each within 0.1 s of the length asked for |
+| Cover art | 40 / 40 (768×768) |
+| App speed under load | Library and status requests: median **9 ms**, slowest **44 ms** |
+| Problems found | Run-on lyrics in 2 of 24 vocal songs, and 3 repeated titles. Both are fixed (bugs 1–2 below). |
+
+| Genre | Songs (vocal / instrumental) | Lengths | Finished between |
+|---|---|---|---|
+| Synth-Pop | 8 (5 / 3) | 90–150 s | 45–196 s |
+| Classic Rock | 8 (5 / 3) | 90–150 s | 202–259 s |
+| Bossa Nova | 8 (5 / 3) | 90–150 s | 271–322 s |
+| House | 8 (4 / 4) | 90–150 s | 328–398 s |
+| Neo-Soul | 8 (5 / 3) | 90–150 s | 413–476 s |
+
+After the run, each genre's 8 songs were put into a playlist named after the genre. All five show as chips above the library.
+
+<details>
+<summary>Full generation log (seconds after all 40 were submitted)</summary>
+
+```
+submitted 40 jobs in 0.0s
+  done  1/40      45s  Synth-Pop    Neon Sunset Drive
+  done  2/40      51s  Synth-Pop    Neon Horizon
+  done  3/40     108s  Synth-Pop    Neon Highway Home
+  done  4/40     115s  Synth-Pop    Midnight Fryer Groove
+  done  5/40     130s  Synth-Pop    Glass Tears Falling
+  done  6/40     181s  Synth-Pop    Sepia Ghosts
+  done  7/40     187s  Synth-Pop    Chasing the Dawn
+  done  8/40     196s  Synth-Pop    Neon Tides
+  done  9/40     202s  Classic Rock Neon Pulse
+  done 10/40     208s  Classic Rock Golden Hour Reverie
+  done 11/40     217s  Classic Rock Sunshine on the Dashboard
+  done 12/40     226s  Classic Rock Linoleum Waltz
+  done 13/40     232s  Classic Rock Stormy Glass Rhythm
+  done 14/40     241s  Classic Rock Sepia Memories
+  done 15/40     250s  Classic Rock Chasing the Golden Horizon
+  done 16/40     259s  Classic Rock Sunset Serenade
+  done 17/40     271s  Bossa Nova   Neon Tide
+  done 18/40     277s  Bossa Nova   Golden Hour Whispers
+  done 19/40     286s  Bossa Nova   Winding Path Back
+  done 20/40     292s  Bossa Nova   Midnight Salsa Swing
+  done 21/40     301s  Bossa Nova   Rain on the Window
+  done 22/40     310s  Bossa Nova   Sepia Memories
+  done 23/40     313s  Bossa Nova   Golden Dawn Stride
+  done 24/40     322s  Bossa Nova   Tides of Amber
+  done 25/40     328s  House        Neon Pulse Drive
+  done 26/40     337s  House        Golden Hour Glow
+  done 27/40     347s  House        Neon Horizon
+  done 28/40     359s  House        Kitchen Disco Fever
+  done 29/40     365s  House        Midnight Glass Reflections
+  done 30/40     377s  House        Faded Memories
+  done 31/40     383s  House        Chasing Golden Light
+  done 32/40     398s  House        Silent Tide Symphony
+  done 33/40     413s  Neo-Soul     Neon Velvet
+  done 34/40     431s  Neo-Soul     Golden Hour Glow
+  done 35/40     437s  Neo-Soul     Echoes on the Asphalt
+  done 36/40     446s  Neo-Soul     Midnight Kitchen Waltz
+  done 37/40     452s  Neo-Soul     Velvet Raindrops
+  done 38/40     461s  Neo-Soul     Sepia Smile
+  done 39/40     470s  Neo-Soul     Golden Hour Run
+  done 40/40     476s  Neo-Soul     Tides of Twilight
+
+finished: 40/40 done in 476s (7.9 min); jobs that needed a retry: 0
+library/jobs request latency under load: median 9 ms, max 44 ms
+```
+
+The first 8 songs came in slowly, with gaps of up to about 50 s, before speeding up. The app itself kept answering in milliseconds throughout, so we believe the shared class services were busier at the start. We could not confirm this from our side. The duplicate titles in the log ("Neon Horizon", "Sepia Memories", "Golden Hour Glow") are bug 2. "Sunset Serenade" and the vocal "Golden Hour Glow" are the two songs with run-on lyrics (bug 1).
+
+</details>
 
 ### Bugs found during testing
 
