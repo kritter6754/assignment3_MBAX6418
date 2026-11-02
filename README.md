@@ -108,9 +108,16 @@ Stop the app with **Ctrl+C**. Songs, covers and playlists you create are saved i
 | Generation fails with "rejected our credentials" | The key is wrong or expired. |
 | A song or DJ break fails | The message says which service failed. Press **Retry** (generation), or playback simply continues (DJ). The class services are shared, so a busy moment can cause a timeout. |
 
-### Optional: Docker or Railway
+### Optional: Docker
 
-Docker: `docker build -t ai-jukebox . && docker run --env-file .env -p 8080:8080 ai-jukebox`, then open http://localhost:8080. The team also used a Railway deployment (`railway.json`, built from the `Dockerfile`) to share the app. It needs the same variables, set as Railway **Variables**. Without a volume at `/data`, generated songs reset on every redeploy.
+If you prefer a container, use the same `.env`:
+
+```bash
+docker build -t ai-jukebox .
+docker run --env-file .env -v "$PWD/data:/data" -p 8080:8080 ai-jukebox
+```
+
+Then open http://localhost:8080. The `-v` option keeps generated songs and playlists in the local `data/` folder. `class-endpoints.txt` is not copied into the image, so with Docker put the four URLs in `.env`.
 
 ## Using the app
 
@@ -194,7 +201,7 @@ Every bug below was found by running the app against the live class services, by
 | 2 | **Repeated song titles.** 3 titles appeared twice among 40 songs ("Neon Horizon", "Sepia Memories", "Golden Hour Glow"). | 40-song stress test | Each song is planned independently, so songs with the same theme got the same title. | Qwen now receives the titles already in the library and is told to pick a new one. If it still repeats one, the app adds "II", "III", and so on. A retest with the theme that caused repeats produced a new title. |
 | 3 | **DJ voice upload rejected (HTTP 400).** | First live test against Chatterbox | The request format was guessed before we had the service's documentation (wrong field names and model id). | Matched the format in the service's published API description: model `chatterbox-v3`, `language_id`, and a multipart `file` + `request` upload. Verified with a live call. |
 | 4 | **DJ broke when the Chatterbox URL had no `/v1`.** The class endpoints file lists `http://…:9008` without it. | Comparing `class-endpoints.txt` with the working settings | The app built `/audio/speech` onto the URL as given, which needs the `/v1` prefix. | All service URLs are normalised. They work with or without `/v1`, and spaces are ignored. The app can also read `class-endpoints.txt` directly. |
-| 5 | **Song generation hung for 3 minutes, then failed** on a hosted copy. | Testing the Railway deployment | Its settings still held the `example.com` placeholder URLs from `.env.example`, so every connection attempt waited until it timed out. | Connection attempts now give up after 10 s, and the error names the host it tried to reach. Unedited placeholders are treated as "not set". `/api/status` and the startup check show which services the app can reach. |
+| 5 | **Song generation hung for 3 minutes, then failed** on a temporary cloud copy the team used for demos (since removed). | Testing that cloud deployment | Its settings still held the `example.com` placeholder URLs from `.env.example`, so every connection attempt waited until it timed out. | Connection attempts now give up after 10 s, and the error names the host it tried to reach. Unedited placeholders are treated as "not set". `/api/status` and the startup check show which services the app can reach. |
 | 6 | **Error messages said only "HTTP 400"**, not why. | The same deployment, when an old model name was set | Only the status code was shown. | Errors now include the service's own explanation, e.g. "Input should be 'chatterbox-v3'". |
 | 7 | **The DJ invented a song.** Introducing the first song, it promised a "Midnight Drive" that didn't exist. | Reading DJ scripts in a live check | The intro prompt didn't forbid naming other songs. | The prompt now says the next song is the only one the DJ knows about and that it must never invent titles. Rechecked live. |
 | 8 | **Empty style dropdown after an update.** | Our own browser, right after a deploy | The browser reused a cached old `app.js` with the new page, and the old script crashed before filling the list (`c.styles is not iterable`). | `app.js` and `style.css` are now loaded with a version tag based on their contents, so every change forces a fresh download. Verified by feeding a browser the old cached script. |
@@ -204,7 +211,6 @@ Every bug below was found by running the app against the live class services, by
 
 - **Lyric timing is estimated.** ACE-Step returns no timing data, and none of the class services can recover it from the audio. The lyrics card spreads the lines over the song's length and labels this "timing estimated". Clicking a line jumps there, which also works as a manual resync. We have not measured how closely the estimate follows the singing.
 - **One shared library.** Generated songs and playlists are shared by everyone using the same running app. Only voice uploads are private to each browser.
-- **The hosted (Railway) copy has no persistent storage**, so its generated songs and playlists reset on every redeploy. A local install keeps them in `data/`.
 - **Not tested:** the musical quality of every generated song by ear, and several people generating at the same time.
 
 The full stress-test numbers are in [docs/stress-test.md](docs/stress-test.md).
