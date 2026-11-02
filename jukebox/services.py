@@ -127,8 +127,9 @@ class ClassServices:
 
     def status(self) -> dict[str, dict]:
         """Quick reachability check of each service, as seen from this server."""
+        # ACE-Step's /health and /v1/models answer without a key; /v1/stats checks it.
         checks = {"text": (self.s.llm_url, "/models"), "image": (self.s.image_url, "/models"),
-                  "music": (self.s.music_url, "/health"), "speech": (self.s.tts_url, "/models")}
+                  "music": (self.s.music_url, "/v1/stats"), "speech": (self.s.tts_url, "/models")}
         out = {}
         for key, (base, path) in checks.items():
             url = self._url(base, path)
@@ -136,9 +137,12 @@ class ClassServices:
             try:
                 r = self._http.get(url, timeout=httpx.Timeout(10.0, connect=5.0))
                 ok, detail = r.status_code == 200, f"HTTP {r.status_code}"
+                hint = ("" if ok else "key rejected: check CLASS_API_KEY" if r.status_code in (401, 403)
+                        else "service is down or busy: try again shortly" if r.status_code >= 500
+                        else "unexpected answer: check its *_BASE_URL")
             except httpx.HTTPError as e:
-                ok, detail = False, type(e).__name__
-            out[key] = {"ok": ok, "host": _host(url), "detail": detail,
+                ok, detail, hint = False, type(e).__name__, "cannot connect: check its *_BASE_URL"
+            out[key] = {"ok": ok, "host": _host(url), "detail": detail, "hint": hint,
                         "ms": round((time.monotonic() - t) * 1000)}
         return out
 
@@ -337,7 +341,7 @@ class MockServices:
         return Audio(_tone_wav(min(duration_s, 8), caption), "wav")
 
     def status(self) -> dict[str, dict]:
-        return {k: {"ok": True, "host": "mock", "detail": "mock", "ms": 0}
+        return {k: {"ok": True, "host": "mock", "detail": "mock", "hint": "", "ms": 0}
                 for k in ("text", "image", "music", "speech")}
 
     def speech(self, text, voice_path=None, language="en") -> Audio:

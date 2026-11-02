@@ -198,3 +198,20 @@ def test_playlists_survive_restart(tmp_path, samples_dir, mock_services):
         c.post("/api/playlists", json={"name": "Keep me"})
     with TestClient(create_app(settings, mock_services, samples_dir=samples_dir)) as c:
         assert [p["name"] for p in c.get("/api/playlists").json()] == ["Keep me"]
+
+
+def test_validation_errors_are_plain_language(client):
+    r = client.post("/api/generate", json={**SONG, "style": ""})
+    assert r.status_code == 422 and r.json()["detail"] == "Choose a style (up to 80 characters)."
+    r = client.post("/api/generate", json={**SONG, "duration_s": "sixty"})
+    assert "whole number of seconds" in r.json()["detail"]
+
+
+def test_unfinished_song_folders_removed_at_startup(tmp_path, samples_dir, mock_services):
+    settings = make_settings(tmp_path)
+    leftover = settings.data_dir / "tracks" / "halfdone"
+    leftover.mkdir(parents=True)
+    (leftover / "cover.jpg").write_bytes(b"x")
+    with TestClient(create_app(settings, mock_services, samples_dir=samples_dir)) as c:
+        assert len(c.get("/api/tracks").json()) == 1
+    assert not leftover.exists()

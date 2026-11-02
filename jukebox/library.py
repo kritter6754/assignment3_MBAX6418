@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import json
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -34,8 +35,16 @@ class Library:
         self.tracks_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._tracks: dict[str, dict] = {}
+        self._remove_unfinished()
         self._load(samples_dir, "sample")
         self._load(self.tracks_dir, "generated")
+
+    def _remove_unfinished(self) -> None:
+        """Delete folders of songs that never finished (the app stopped mid-generation).
+        Runs at startup, when no generation can be in progress."""
+        for folder in self.tracks_dir.iterdir():
+            if folder.is_dir() and not (folder / "meta.json").is_file():
+                shutil.rmtree(folder, ignore_errors=True)
 
     def _load(self, root: Path, source: str) -> None:
         if not root.is_dir():

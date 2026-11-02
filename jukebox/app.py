@@ -13,6 +13,7 @@ import secrets
 from pathlib import Path
 
 from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -118,6 +119,30 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     @app.exception_handler(ValueError)
     async def value_error(_: Request, e: ValueError):
         return JSONResponse({"detail": str(e)}, status_code=400)
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(_: Request, e: RequestValidationError):
+        # Plain-language messages instead of pydantic's ("String should have at least 1 character").
+        friendly = {
+            "style": "Choose a style (up to 80 characters).",
+            "mood": "Enter a mood (up to 80 characters).",
+            "theme": "The theme can be at most 300 characters.",
+            "duration_s": f"Duration must be a whole number of seconds between {MIN_DURATION} and {MAX_DURATION}.",
+            "vocal": "Choose vocal or instrumental.",
+            "name": "Give the playlist a name (up to 40 characters).",
+            "track_ids": "That list of songs is not valid.",
+            "next_id": "Choose a song for the DJ to introduce.",
+            "dj_name": "The DJ name can be at most 40 characters.",
+            "file": "Choose an MP3 or WAV file to upload.",
+            "x-session": "Reload the page and try again (missing browser session).",
+        }
+        msgs = []
+        for err in e.errors():
+            field = str(err["loc"][-1]) if err.get("loc") else ""
+            msg = friendly.get(field, f"Invalid value for {field}: {err.get('msg', '')}".strip())
+            if msg not in msgs:
+                msgs.append(msg)
+        return JSONResponse({"detail": " ".join(msgs) or "The request was not valid."}, status_code=422)
 
     # -- pages & health ----------------------------------------------------
     @app.get("/", include_in_schema=False)
@@ -271,7 +296,7 @@ def _report_services(services: Services) -> None:
         if r["ok"]:
             log.info("  OK    %-22s %s (%d ms)", names[key], r["host"], r["ms"])
         else:
-            log.warning("  FAIL  %-22s %s: %s (check its *_BASE_URL)", names[key], r["host"], r["detail"])
+            log.warning("  FAIL  %-22s %s: %s (%s)", names[key], r["host"], r["detail"], r["hint"])
 
 
 def main() -> None:

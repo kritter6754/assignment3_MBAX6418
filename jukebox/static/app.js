@@ -485,7 +485,8 @@ async function playDJ() {
     await playSrc(clip.audio_url, token);
   } catch (e) {
     if (token !== state.token) return;
-    toast(`DJ unavailable: ${e.message} Continuing to the next song.`, "err", 8000);
+    const why = /[.!?]$/.test(e.message) ? e.message : `${e.message}.`;
+    toast(`DJ unavailable: ${why} Continuing to the next song.`, "err", 8000);
     startSong(state.pos + 1);
   }
 }
@@ -636,10 +637,18 @@ async function pollJobs() {
   try {
     jobs = await api("/api/jobs");
   } catch (e) {
-    pollTimer = setTimeout(pollJobs, 5000);
+    pollTimer = setTimeout(pollJobs, 5000); // server unreachable (e.g. restarting): keep trying
     return;
   }
   let newDone = false;
+  // A job we saw in progress that the server no longer knows about: the app was restarted mid-way.
+  const ids = new Set(jobs.map((j) => j.id));
+  for (const [id, info] of state.jobsKnown) {
+    if (!ids.has(id) && (info === "queued" || info === "running")) {
+      toast("The jukebox server restarted before a song finished, so that song was lost. Please generate it again.", "err", 12000);
+      state.jobsKnown.delete(id);
+    }
+  }
   for (const j of jobs) {
     const before = state.jobsKnown.get(j.id);
     if (before && before !== "done" && j.status === "done") {

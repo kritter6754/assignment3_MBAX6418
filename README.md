@@ -12,7 +12,7 @@ library with an AI DJ who talks between tracks. All of it runs on the class serv
 
 No paid services are used, and port 9000 is not used.
 
-> **Status:** sections marked _TODO_ are still being filled in from tests against the class endpoints.
+> **Status:** the sections marked _TODO_ (design judgment, screenshots) are still to be completed by the team.
 
 ## How it works
 
@@ -181,19 +181,46 @@ The automated tests replace the class services with mocks, so they run without n
 
 ### Test results
 
-_TODO: record inputs, expected and actual results for each core feature and at least one failure case, from runs against the class endpoints, and separate completed tests from unchecked claims._
+**How we tested:**
+- On 2026-11-01 we downloaded the GitHub ZIP into an empty folder and installed it using only this README, with the pip route on Python 3.13. The uv route on Python 3.12 had been tested the same way earlier.
+- We tested against the live class services, driving the app through a real browser (Playwright) the way a user would.
+- Failures were created on purpose: a small relay in front of ACE-Step or Chatterbox returned "503 service unavailable" on demand, and separate runs used a wrong key and an unreachable host.
+- The requirement-by-requirement record is in [docs/rubric-test.md](docs/rubric-test.md), and the 40-song run is in [docs/stress-test.md](docs/stress-test.md).
 
-| # | Feature | Input | Expected | Actual | Status |
+**Completed tests:**
+
+| # | Feature | Input | Expected | Actual | Result |
 |---|---|---|---|---|---|
-| 1 | Song generation | | | | not yet run |
-| 2 | Cover art | | | | not yet run |
-| 3 | AI DJ (default voice) | | | | not yet run |
-| 4 | AI DJ (uploaded voice) | | | | not yet run |
-| 5 | Failure case | | | | not yet run |
+| 1 | Song generation (vocal) | Bossa Nova (from list), Romantic, theme "una noche en Río", **15 s** (minimum), Spanish lyrics | Playable 15 s song with AI lyrics in Spanish, added to the library | "Samba de Medianoche", 15.0 s, 8 Spanish lyric lines ("La luna besaba la arena,"), shown in the library | Pass |
+| 2 | Song generation (instrumental) | Custom style "Celtic sea shanty", Epic, "a storm at sea", **240 s** (maximum) | 240 s instrumental, no lyrics | "Fury of the North Wind", 240.0 s, marked instrumental | Pass |
+| 3 | Song generation at scale | 40 songs, 5 genres, 90–150 s, all submitted at once | All finish and are at least 1:30 | 40/40 in 7.9 min, each within 0.1 s of the requested length | Pass (found bugs 1–2) |
+| 4 | Cover art | The songs in tests 1–3 | A new cover for each song that reflects its theme, style or mood, shown on that song's card | Disco: mirror ball over a night city. Sea shanty: storm leviathan over black waves. Bossa Nova "noche en Río": moonlit couple at Copacabana. 40/40 covers in the stress test. | Pass (judged by eye) |
+| 5 | AI DJ, default voice | Queue Samba de Medianoche → Disco Disco Ball Light → Rainy Pages, press Play | Song, DJ, song, DJ, song, played automatically. Each DJ break names both songs. Never two sounds at once. | Exactly that order. Both DJ breaks named both songs ("From the tender moonlit romance of Samba de Medianoche, we shift gears to the vibrant energy of Disco Disco Ball Light…"). At most one sound playing at any moment. | Pass |
+| 6 | AI DJ, uploaded voice | An 8 s AI-generated reference, uploaded as MP3 and then as WAV | The DJ break uses the uploaded voice, with no fallback | For both files the DJ break played with no fallback warning. **Use default** switched back. | Pass (voice similarity not judged by ear) |
+| 7 | Voice upload checks | `.txt` file, fake `.mp3`, 1 s WAV, 11 MB WAV | Rejected with a clear message; default voice kept | "Upload an MP3 or WAV file." · "That file does not look like a real MP3 recording." · "…shorter than 3 seconds…" · "The file is larger than 10 MB." | Pass |
+| 8 | Controls | DJ switched off; then 26 rapid clicks on skip, rewind and play/pause within 3 s | No DJ break when off. A consistent state, with no overlap. | Song → song with no DJ. After the clicks: one song loaded, play button matching the audio, at most one sound playing, no errors. | Pass |
+| 9 | **Failure:** music service down | Generate while ACE-Step returns 503, then press **Retry** once it is back | A readable error and a **Retry** button. The retry finishes without redoing completed steps. | Failed after 8 s with "Music service (ACE-Step): the service is busy or restarting; retry in a moment". Retry finished in 6 s with the same title, so lyrics and cover were reused. | Pass |
+| 10 | **Failure:** DJ voice service down | Play two songs while Chatterbox returns 503 | A message, and playback continues | "DJ unavailable: … Continuing to the next song.", then the next song played | Pass |
+| 11 | **Failure:** wrong key | `CLASS_API_KEY` set to a wrong value | A clear error | Generation failed in 1 s: "the service rejected our credentials (check CLASS_API_KEY)". The startup check flags all four services as "key rejected". | Pass after fixing bug 10 |
+| 12 | **Failure:** unreachable service | Qwen URL pointing at a host that never answers | Fails quickly and names the host | Failed in 10 s: "could not connect to 10.255.255.1:9001 (check its *_BASE_URL setting)" | Pass |
+| 13 | **Failure:** invalid input | 9 bad requests sent straight to the API (duration 14, 241, −5 or text; empty style; blank mood; over-long style or theme; unknown language) | Rejected, and no song started | All 9 rejected with plain messages; 0 jobs created | Pass after fixing bug 12 |
+| 14 | **Failure:** app restarted mid-generation | Stop the app while a song is being made, then start it again | The user is told; no leftovers | Before the fix: the song vanished silently and a half-finished folder stayed on disk. After: a message asks to generate it again, and the folder is cleaned up. | Pass after fixing bug 11 |
+| 15 | Safety: HTML in text fields | Theme `<img src=x onerror="alert(1)"><script>alert(2)</script>` | Shown as plain text, never run | Shown as text; no script ran, no page errors | Pass |
+| 16 | Safeguard: credentials | Searched the page, scripts, API responses, server logs and the ZIP for the key | Key appears nowhere outside the server's `.env` | Not found in the page, scripts, any API response or the server logs. The ZIP has no `.env`. | Pass |
+| 17 | Safeguard: voice privacy | Tried to download an uploaded voice by 6 different URL tricks; checked from a second browser | Uploads are private and not downloadable | All 6 returned 404. The second browser saw no uploaded voice. **Use default** deleted the file. | Pass |
+| 18 | Setup from the GitHub ZIP | Fresh download, README steps only, `class-endpoints.txt` dropped into the folder | Starts, and the startup check shows all four services OK | Worked with uv (Python 3.12) and with pip (Python 3.13) | Pass |
+
+**Claims not yet checked:**
+- The musical quality of every song, judged by ear.
+- Whether the DJ really sounds like an uploaded voice.
+- How closely the estimated lyric timing follows the singing.
+- Several people using one copy of the app at once.
+- Windows. All tests ran on macOS.
+- A teammate installing from the ZIP on their own computer (still to be done).
 
 ### Bugs found during testing
 
-Every bug below was found by running the app against the live class services, by a stress test, or by a browser test. The **How found** column says which. Each one is fixed in the current code, and a regression test now covers most of them (`uv run pytest`).
+Each bug below was found by running the app against the live class services, by a stress test, or by a browser test. The **How found** column says which. Each one is fixed in the current code, and a regression test now covers most of them (`uv run pytest`).
 
 | # | Bug | How found | Cause | Fix |
 |---|---|---|---|---|
@@ -206,6 +233,10 @@ Every bug below was found by running the app against the live class services, by
 | 7 | **The DJ invented a song.** Introducing the first song, it promised a "Midnight Drive" that didn't exist. | Reading DJ scripts in a live check | The intro prompt didn't forbid naming other songs. | The prompt now says the next song is the only one the DJ knows about and that it must never invent titles. Rechecked live. |
 | 8 | **Empty style dropdown after an update.** | Our own browser, right after a deploy | The browser reused a cached old `app.js` with the new page, and the old script crashed before filling the list (`c.styles is not iterable`). | `app.js` and `style.css` are now loaded with a version tag based on their contents, so every change forces a fresh download. Verified by feeding a browser the old cached script. |
 | 9 | **Server log errors** (`TypeError: %d format`). | Live end-to-end run | The filter that scrubs the API key from logs turned numeric log values into text. | Only text values are scrubbed now. |
+| 10 | **Misleading startup check.** With a wrong key it said "HTTP 401 (check its *_BASE_URL)", and it reported ACE-Step as OK even with a bad key. | Requirement test (test 11) | Every failure got the same "check the URL" hint, and ACE-Step's `/health` answers without a key. | The hint now matches the cause ("key rejected", "service is down or busy", "cannot connect"). ACE-Step is checked through `/v1/stats`, which requires the key. |
+| 11 | **A song in progress vanished silently** when the app restarted, and a half-finished song folder stayed on disk. | Requirement test (test 14) | Jobs live only in memory. Nothing told the browser a job was lost, and nothing cleaned up partial folders. | The page now says the song was lost and asks to generate it again. Unfinished folders are deleted when the app starts. |
+| 12 | **Technical error wording** for invalid input, such as "String should have at least 1 character". | Requirement test (test 13) | The web framework's default validation messages were passed through unchanged. | Messages now say what to fix, e.g. "Choose a style (up to 80 characters)." |
+| 13 | **A missing period in the DJ error message** ("…retry in a moment Continuing to the next song"). | Requirement test (test 10) | The message was joined without punctuation. | Punctuation is added when missing. |
 
 ### Known limitations (not fixed)
 
