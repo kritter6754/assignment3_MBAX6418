@@ -22,6 +22,7 @@ from .creative import LANGUAGES, MAX_DURATION, MIN_DURATION, SongRequest
 from .dj import DJ, VoiceStore
 from .jobs import JobManager
 from .library import Library
+from .playlists import PlaylistStore
 from .services import ServiceError, Services, make_services
 
 log = logging.getLogger("jukebox")
@@ -52,6 +53,16 @@ class GenerateBody(BaseModel):
     language: str = "en"
 
 
+class PlaylistBody(BaseModel):
+    name: str = Field(max_length=200)
+    track_ids: list[str] = Field(default_factory=list, max_length=500)
+
+
+class PlaylistPatch(BaseModel):
+    name: str | None = Field(default=None, max_length=200)
+    track_ids: list[str] | None = Field(default=None, max_length=500)
+
+
 class DJBody(BaseModel):
     prev_id: str | None = None
     next_id: str
@@ -77,6 +88,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     jobs = JobManager(services, library)
     voices = VoiceStore(data_dir)
     dj = DJ(services, library, voices, data_dir)
+    playlists = PlaylistStore(data_dir)
 
     app = FastAPI(title="AI Jukebox", docs_url=None, redoc_url=None)
     index_html = _versioned_index()
@@ -155,6 +167,53 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     @app.delete("/api/jobs/{job_id}")
     def dismiss_job(job_id: str):
         jobs.dismiss(job_id)
+        return {"ok": True}
+
+    # -- playlists (library folders) -------------------------------------------
+    def known(ids: list[str]) -> list[str]:
+        unknown = [i for i in ids if library.get(i) is None]
+        if unknown:
+            raise HTTPException(404, "One of those songs is no longer in the library.")
+        return ids
+
+    def visible(p: dict) -> dict:
+        # Songs can vanish (e.g. a redeploy without a volume); hide ids that no longer exist.
+        return {**p, "track_ids": [i for i in p["track_ids"] if library.get(i) is not None]}
+
+    @app.get("/api/playlists")
+    def list_playlists():
+        return [visible(p) for p in playlists.list()]
+
+    @app.post("/api/playlists")
+    def create_playlist(body: PlaylistBody):
+        return visible(playlists.create(body.name, known(body.track_ids)))
+
+    @app.patch("/api/playlists/{pid}")
+    def update_playlist(pid: str, body: PlaylistPatch):
+        try:
+            return visible(playlists.update(pid, body.name,
+                                            known(body.track_ids) if body.track_ids is not None else None))
+        except KeyError:
+            raise HTTPException(404, "That playlist no longer exists.") from None
+
+    @app.put("/api/playlists/{pid}/tracks/{track_id}")
+    def add_to_playlist(pid: str, track_id: str):
+        known([track_id])
+        try:
+            return visible(playlists.add_track(pid, track_id))
+        except KeyError:
+            raise HTTPException(404, "That playlist no longer exists.") from None
+
+    @app.delete("/api/playlists/{pid}/tracks/{track_id}")
+    def remove_from_playlist(pid: str, track_id: str):
+        try:
+            return visible(playlists.remove_track(pid, track_id))
+        except KeyError:
+            raise HTTPException(404, "That playlist no longer exists.") from None
+
+    @app.delete("/api/playlists/{pid}")
+    def delete_playlist(pid: str):
+        playlists.delete(pid)
         return {"ok": True}
 
     # -- DJ & voice ----------------------------------------------------------

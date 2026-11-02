@@ -21,6 +21,8 @@ const state = {
   voiceVersion: 0,
   seenTracks: new Set(),
   jobsKnown: new Map(), // job id -> last status
+  playlists: [],        // [{id, name, track_ids}]
+  view: "all",          // "all" or a playlist id: which songs the library shows
 };
 
 // ---------- helpers ----------
@@ -85,29 +87,178 @@ async function loadTracks() {
   renderLibrary();
 }
 
+const currentPlaylist = () => state.playlists.find((p) => p.id === state.view) || null;
+
+function viewTracks() {
+  const pl = currentPlaylist();
+  return pl ? pl.track_ids.map(track).filter(Boolean) : state.tracks;
+}
+
 function renderLibrary() {
   const lib = $("library");
   lib.replaceChildren();
-  $("track-count").textContent = `(${state.tracks.length})`;
-  if (!state.tracks.length) {
-    lib.append(el("div", { class: "empty" }, "No songs yet. Generate one with the form on the right."));
+  if (state.view !== "all" && !currentPlaylist()) state.view = "all"; // playlist was deleted
+  renderFolders();
+  const pl = currentPlaylist();
+  const tracks = viewTracks();
+  $("track-count").textContent = `(${tracks.length})`;
+  if (!tracks.length) {
+    lib.append(el("div", { class: "empty" }, pl
+      ? `“${pl.name}” is empty. Click Edit to pick songs, or use the 🗂 button on any song in All songs.`
+      : "No songs yet. Generate one with the form on the right."));
     return;
   }
-  const playingId = state.phase === "song" ? state.queue[state.pos] : null;
-  for (const t of state.tracks) {
+  for (const t of tracks) {
     const isNew = t.source === "generated" && !state.seenTracks.has(t.id);
     const meta = [t.style, t.mood, t.vocal ? "vocal" : "instrumental", fmt(t.duration_s)].filter(Boolean).join(" · ");
-    lib.append(el("article", { class: `track${t.id === playingId ? " playing" : ""}`, "data-id": t.id },
+    lib.append(el("article", { class: "track", "data-id": t.id },
       el("div", { class: "cover-wrap" },
         t.cover_url ? el("img", { src: t.cover_url, alt: `Cover art for ${t.title}`, loading: "lazy" }) : null,
         el("span", { class: `badge${isNew ? " new" : ""}` }, isNew ? "new" : t.source === "sample" ? "sample" : "yours"),
-        el("button", { class: "play-over", title: "Play now", "aria-label": `Play ${t.title}`, onclick: () => playNow(t.id) }, "▶")),
+        el("button", { class: "play-over", title: "Play now", "aria-label": `Play ${t.title}`, onclick: () => cardPlay(t.id) }, "▶")),
       el("div", { class: "track-body" },
         el("div", { class: "track-title", title: t.title }, t.title),
         el("div", { class: "track-meta" }, meta),
         el("div", { class: "track-actions" },
           el("button", { class: "btn small", onclick: () => enqueue(t.id) }, "+ Queue"),
-          el("button", { class: "btn small ghost", onclick: () => showLyrics(t) }, t.vocal ? "Lyrics" : "Details")))));
+          el("button", { class: "btn small ghost", onclick: () => showLyrics(t) }, t.vocal ? "Lyrics" : "Details"),
+          el("button", { class: "btn small ghost icon", title: "Add to playlist", "aria-label": `Add ${t.title} to a playlist`,
+            onclick: () => openAddToPlaylist(t.id) }, "🗂")))));
+  }
+  syncPlayStates();
+}
+
+// The ▶ on the card of the song that is playing becomes ⏸ and toggles it.
+function syncPlayStates() {
+  const cur = state.phase === "song" ? state.queue[state.pos] : null;
+  const playing = cur && !audio.paused;
+  for (const card of document.querySelectorAll("#library .track")) {
+    const id = card.dataset.id;
+    const btn = card.querySelector(".play-over");
+    const title = track(id)?.title || "song";
+    card.classList.toggle("playing", id === cur);
+    const isPlaying = id === cur && playing;
+    btn.textContent = isPlaying ? "⏸" : "▶";
+    btn.title = isPlaying ? "Pause" : id === cur ? "Resume" : "Play now";
+    btn.setAttribute("aria-label", `${isPlaying ? "Pause" : "Play"} ${title}`);
+  }
+}
+
+function cardPlay(id) {
+  if (state.phase === "song" && state.queue[state.pos] === id) {
+    if (audio.paused) audio.play().catch(() => {}); else audio.pause();
+  } else {
+    playNow(id);
+  }
+}
+
+// ---------- playlists (library folders) ----------
+async function loadPlaylists() {
+  try { state.playlists = await api("/api/playlists"); } catch (e) { toast(e.message, "err"); }
+  renderLibrary();
+}
+
+function setView(view) {
+  state.view = view;
+  renderLibrary();
+}
+
+function renderFolders() {
+  const box = $("folders");
+  box.replaceChildren(
+    el("button", { class: `chip${state.view === "all" ? " active" : ""}`, onclick: () => setView("all"),
+      "aria-pressed": String(state.view === "all") }, "All songs", el("span", { class: "n" }, state.tracks.length)),
+    ...state.playlists.map((p) => el("button", { class: `chip${state.view === p.id ? " active" : ""}`, onclick: () => setView(p.id),
+      "aria-pressed": String(state.view === p.id) }, `🗂 ${p.name}`, el("span", { class: "n" }, p.track_ids.length))));
+  const pl = currentPlaylist();
+  if (pl) {
+    box.append(el("span", { class: "folder-actions" },
+      el("button", { class: "btn small ghost", onclick: () => openPlaylistDialog(pl) }, "✎ Edit"),
+      el("button", { class: "btn small ghost", onclick: () => deletePlaylist(pl) }, "🗑 Delete")));
+  }
+}
+
+let editing = null; // playlist being edited in the dialog, or null when creating
+
+function openPlaylistDialog(pl = null, preselect = []) {
+  editing = pl;
+  $("pl-dlg-title").textContent = pl ? `Edit “${pl.name}”` : "Create playlist";
+  $("pl-save").textContent = pl ? "Save" : "Create";
+  $("pl-name").value = pl ? pl.name : "";
+  $("pl-error").hidden = true;
+  const chosen = new Set(pl ? pl.track_ids : preselect);
+  $("pl-pick").replaceChildren(...(state.tracks.length ? state.tracks.map((t) => el("label", {},
+    el("input", { type: "checkbox", value: t.id, checked: chosen.has(t.id) }),
+    t.cover_url ? el("img", { src: t.cover_url, alt: "" }) : null,
+    el("span", {}, t.title, el("div", { class: "sub" }, `${t.style} · ${t.mood}`)))) : [el("p", { class: "muted" }, "The library is empty.")]));
+  $("pl-dlg").showModal();
+  $("pl-name").focus();
+}
+
+async function savePlaylist(ev) {
+  ev.preventDefault();
+  const picked = [...$("pl-pick").querySelectorAll("input:checked")].map((c) => c.value);
+  let trackIds = picked;
+  if (editing) { // keep the playlist's existing order; newly ticked songs go at the end
+    const keep = editing.track_ids.filter((id) => picked.includes(id));
+    trackIds = keep.concat(picked.filter((id) => !keep.includes(id)));
+  }
+  try {
+    const p = editing
+      ? await api(`/api/playlists/${editing.id}`, { method: "PATCH", json: { name: $("pl-name").value, track_ids: trackIds } })
+      : await api("/api/playlists", { method: "POST", json: { name: $("pl-name").value, track_ids: trackIds } });
+    $("pl-dlg").close();
+    toast(editing ? `Saved “${p.name}”.` : `Created “${p.name}” with ${p.track_ids.length} song${p.track_ids.length === 1 ? "" : "s"}.`, "ok", 3000);
+    state.view = p.id;
+    await loadPlaylists();
+  } catch (e) {
+    $("pl-error").textContent = e.message;
+    $("pl-error").hidden = false;
+  }
+}
+
+async function deletePlaylist(pl) {
+  if (!confirm(`Delete the playlist “${pl.name}”? Its songs stay in the library.`)) return;
+  try {
+    await api(`/api/playlists/${pl.id}`, { method: "DELETE" });
+    state.view = "all";
+    toast(`Deleted “${pl.name}”.`, "ok", 3000);
+    await loadPlaylists();
+  } catch (e) { toast(e.message, "err"); }
+}
+
+let addingTrack = null;
+
+function openAddToPlaylist(trackId) {
+  addingTrack = trackId;
+  $("pl-add-title").textContent = `Add “${track(trackId)?.title}” to…`;
+  renderAddList();
+  $("pl-add-dlg").showModal();
+}
+
+function renderAddList() {
+  const list = $("pl-add-list");
+  if (!state.playlists.length) {
+    list.replaceChildren(el("p", { class: "muted" }, "No playlists yet. Create one with “+ New playlist”."));
+    return;
+  }
+  list.replaceChildren(...state.playlists.map((p) => el("label", {},
+    el("input", { type: "checkbox", checked: p.track_ids.includes(addingTrack),
+      onchange: (e) => togglePlaylistTrack(p, addingTrack, e.target.checked, e.target) }),
+    el("span", {}, `🗂 ${p.name}`, el("div", { class: "sub" }, `${p.track_ids.length} song${p.track_ids.length === 1 ? "" : "s"}`)))));
+}
+
+async function togglePlaylistTrack(p, trackId, add, box) {
+  box.disabled = true;
+  try {
+    const updated = await api(`/api/playlists/${p.id}/tracks/${trackId}`, { method: add ? "PUT" : "DELETE" });
+    state.playlists = state.playlists.map((x) => (x.id === updated.id ? updated : x));
+    renderAddList();
+    renderLibrary();
+  } catch (e) {
+    box.checked = !add;
+    box.disabled = false;
+    toast(e.message, "err");
   }
 }
 
@@ -136,9 +287,10 @@ function playNow(id) {
 }
 
 function playAll() {
-  if (!state.tracks.length) return toast("The library is empty.", "err");
-  state.queue = state.tracks.map((t) => t.id);
-  state.tracks.forEach((t) => state.seenTracks.add(t.id));
+  const tracks = viewTracks();
+  if (!tracks.length) return toast(currentPlaylist() ? "This playlist is empty." : "The library is empty.", "err");
+  state.queue = tracks.map((t) => t.id);
+  tracks.forEach((t) => state.seenTracks.add(t.id));
   startSong(0);
 }
 
@@ -285,6 +437,7 @@ function updatePlayButton() {
   const playing = state.phase !== "idle" && (!audio.paused || state.phase === "dj-wait");
   $("btn-play").textContent = playing ? "⏸" : "▶";
   $("btn-play").setAttribute("aria-label", playing ? "Pause" : "Play");
+  syncPlayStates();
 }
 
 function renderQueue() {
@@ -510,6 +663,11 @@ async function init() {
   }));
   $("gen-form").addEventListener("submit", submitGenerate);
   $("play-all").addEventListener("click", playAll);
+  $("new-playlist").addEventListener("click", () => openPlaylistDialog());
+  $("pl-form").addEventListener("submit", savePlaylist);
+  $("pl-cancel").addEventListener("click", () => $("pl-dlg").close());
+  $("pl-add-done").addEventListener("click", () => $("pl-add-dlg").close());
+  $("pl-add-new").addEventListener("click", () => { $("pl-add-dlg").close(); openPlaylistDialog(null, [addingTrack]); });
   $("btn-play").addEventListener("click", togglePlay);
   $("btn-skip").addEventListener("click", skip);
   $("btn-rewind").addEventListener("click", rewind);
@@ -530,7 +688,7 @@ async function init() {
 
   await loadTracks();
   state.tracks.forEach((t) => state.seenTracks.add(t.id));
-  renderLibrary();
+  await loadPlaylists();
   renderQueue();
   refreshVoice();
   pollJobs();

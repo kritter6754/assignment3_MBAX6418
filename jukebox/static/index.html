@@ -19,8 +19,12 @@
       <section class="card library-panel">
         <div class="section-head">
           <h2>Library <span id="track-count" class="muted"></span></h2>
-          <button id="play-all" class="btn primary">▶ Play all</button>
+          <div class="head-actions">
+            <button id="new-playlist" class="btn">+ Create Playlist</button>
+            <button id="play-all" class="btn primary">▶ Play all</button>
+          </div>
         </div>
+        <div id="folders" class="folders" aria-label="Library folders"></div>
         <div id="library" class="grid scroll" aria-live="polite"></div>
       </section>
 
@@ -117,6 +121,29 @@
     <p id="lyrics-meta" class="muted"></p>
     <pre id="lyrics-body"></pre>
     <form method="dialog"><button class="btn">Close</button></form>
+  </dialog>
+
+  <dialog id="pl-dlg" aria-labelledby="pl-dlg-title">
+    <form id="pl-form" method="dialog">
+      <h3 id="pl-dlg-title">Create playlist</h3>
+      <label>Name <input id="pl-name" maxlength="40" required placeholder="e.g. Road trip"></label>
+      <p class="muted tiny">Songs in this playlist</p>
+      <div id="pl-pick" class="pick-list"></div>
+      <p id="pl-error" class="error" role="alert" hidden></p>
+      <div class="dlg-actions">
+        <button type="button" id="pl-cancel" class="btn ghost">Cancel</button>
+        <button type="submit" id="pl-save" class="btn primary">Create</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="pl-add-dlg" aria-labelledby="pl-add-title">
+    <h3 id="pl-add-title">Add to playlist</h3>
+    <div id="pl-add-list" class="pick-list"></div>
+    <div class="dlg-actions">
+      <button type="button" id="pl-add-new" class="btn ghost">+ New playlist</button>
+      <button type="button" id="pl-add-done" class="btn primary">Done</button>
+    </div>
   </dialog>
 
   <div id="toasts" aria-live="assertive"></div>

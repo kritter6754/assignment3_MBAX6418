@@ -167,3 +167,34 @@ def test_index_versions_static_assets(client):
     html = client.get("/").text
     assert "/static/app.js?v=" in html and "/static/style.css?v=" in html
     assert client.get("/").headers["cache-control"] == "no-cache"
+
+
+def test_playlists_crud(client):
+    sample = client.get("/api/tracks").json()[0]["id"]
+    p = client.post("/api/playlists", json={"name": "  Road   trip ", "track_ids": [sample]}).json()
+    assert p["name"] == "Road trip" and p["track_ids"] == [sample]
+    dup = client.post("/api/playlists", json={"name": "road TRIP"})
+    assert dup.status_code == 400 and "already exists" in dup.json()["detail"]
+    assert client.post("/api/playlists", json={"name": "   "}).status_code == 400
+    assert client.post("/api/playlists", json={"name": "x", "track_ids": ["nope"]}).status_code == 404
+
+    job = wait_job(client, client.post("/api/generate", json=SONG).json()["id"])
+    p = client.put(f"/api/playlists/{p['id']}/tracks/{job['track_id']}").json()
+    p = client.put(f"/api/playlists/{p['id']}/tracks/{job['track_id']}").json()  # adding twice is a no-op
+    assert p["track_ids"] == [sample, job["track_id"]]
+    p = client.patch(f"/api/playlists/{p['id']}", json={"name": "Chill", "track_ids": [job["track_id"], sample]}).json()
+    assert p["name"] == "Chill" and p["track_ids"] == [job["track_id"], sample]
+    p = client.delete(f"/api/playlists/{p['id']}/tracks/{sample}").json()
+    assert p["track_ids"] == [job["track_id"]]
+    assert [x["name"] for x in client.get("/api/playlists").json()] == ["Chill"]
+    client.delete(f"/api/playlists/{p['id']}")
+    assert client.get("/api/playlists").json() == []
+    assert client.put(f"/api/playlists/{p['id']}/tracks/{sample}").status_code == 404
+
+
+def test_playlists_survive_restart(tmp_path, samples_dir, mock_services):
+    settings = make_settings(tmp_path)
+    with TestClient(create_app(settings, mock_services, samples_dir=samples_dir)) as c:
+        c.post("/api/playlists", json={"name": "Keep me"})
+    with TestClient(create_app(settings, mock_services, samples_dir=samples_dir)) as c:
+        assert [p["name"] for p in c.get("/api/playlists").json()] == ["Keep me"]
