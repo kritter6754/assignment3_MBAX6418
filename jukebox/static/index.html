@@ -104,8 +104,9 @@
       <div class="progress"><span id="t-cur">0:00</span><input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek"><span id="t-dur">0:00</span></div>
     </div>
     <div class="controls">
+      <button id="btn-rewind" class="round ghost" aria-label="Rewind" title="Restart song (press twice for previous)">⏮</button>
       <button id="btn-play" class="round" aria-label="Play">▶</button>
-      <button id="btn-skip" class="round ghost" aria-label="Skip">⏭</button>
+      <button id="btn-skip" class="round ghost" aria-label="Skip" title="Skip">⏭</button>
       <button id="btn-queue" class="btn small ghost" aria-label="Show queue">Queue <span id="queue-count">0</span></button>
     </div>
     <audio id="audio" preload="auto"></audio>

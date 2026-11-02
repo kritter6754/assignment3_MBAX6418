@@ -241,6 +241,24 @@ function stopQueue(finished = false) {
   renderLibrary();
 }
 
+const RESTART_WINDOW_S = 3; // rewind within the first 3 s of a song goes to the previous song
+
+function rewind() {
+  if (state.phase === "song") {
+    if (audio.currentTime > RESTART_WINDOW_S || state.pos <= 0) {
+      audio.currentTime = 0;
+      if (audio.paused) audio.play().catch(() => {});
+    } else {
+      startSong(state.pos - 1);
+    }
+  } else if (state.phase === "dj" || state.phase === "dj-wait") {
+    audio.pause();
+    startSong(state.pos);              // back to the song the DJ was talking about
+  } else if (state.pos >= 0 && state.queue.length) {
+    startSong(Math.min(state.pos, state.queue.length - 1)); // queue finished: replay the last song
+  }
+}
+
 function skip() {
   if (state.phase === "song") {
     audio.pause();
@@ -494,6 +512,7 @@ async function init() {
   $("play-all").addEventListener("click", playAll);
   $("btn-play").addEventListener("click", togglePlay);
   $("btn-skip").addEventListener("click", skip);
+  $("btn-rewind").addEventListener("click", rewind);
   $("btn-queue").addEventListener("click", () => { $("queue-panel").hidden = !$("queue-panel").hidden; });
   $("queue-clear").addEventListener("click", () => {
     state.queue = state.phase === "idle" ? [] : state.queue.slice(0, state.pos + 1);
