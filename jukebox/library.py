@@ -15,6 +15,7 @@ from pathlib import Path
 from PIL import Image
 
 from .config import SAMPLES_DIR
+from .creative import normalize_lyrics
 
 
 def save_cover(raw: bytes, dest_dir: Path, max_side: int = 768) -> str:
@@ -79,6 +80,7 @@ class Library:
         keys = ("id", "title", "style", "mood", "duration_s", "vocal", "language", "theme",
                 "summary", "lyrics", "source", "created_at")
         out = {k: track.get(k) for k in keys}
+        out["lyrics"] = normalize_lyrics(out.get("lyrics") or "")  # also repairs songs saved before the fix
         out["audio_url"] = f"{base}/{track['audio']}"
         out["cover_url"] = f"{base}/{track['cover']}" if track.get("cover") else None
         return out

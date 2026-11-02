@@ -133,3 +133,24 @@ def test_bad_request_includes_service_message(tmp_path):
 
     with pytest.raises(ServiceError, match="Input should be 'chatterbox-v3'"):
         svc_with(handler, tmp_path).speech("hi")
+
+
+def test_normalize_lyrics_repairs_run_on_text():
+    from jukebox.creative import normalize_lyrics
+    raw = "[Verse]Golden light spills across the sand,Waves whisper soft in a rhythmic band,No one else is here to see.[Chorus]Oh, let the evening carry us away,Where the stars begin to play."
+    lines = normalize_lyrics(raw).splitlines()
+    assert lines[0] == "[Verse]" and lines[1] == "Golden light spills across the sand,"
+    assert "[Chorus]" in lines and lines[-1] == "Where the stars begin to play."
+    good = "[Verse]\nShort line one\nShort line two, and more\n\n[Chorus]\nHold on"
+    assert normalize_lyrics(good) == good
+    assert normalize_lyrics("[Instrumental]") == "[Instrumental]"
+
+
+def test_duplicate_title_gets_suffix():
+    class Fake:
+        def chat(self, messages, schema=None, **kw):
+            assert "Neon Rain" in messages[-1]["content"]  # existing titles are passed to Qwen
+            return '{"title":"Neon Rain","summary":"s","caption":"c","bpm":96,"lyrics":"[Verse]\\nline one here\\nline two here","cover_prompt":"x"}'
+
+    plan = plan_song(Fake(), SongRequest("Synth-Pop", "Dreamy", 60, True), avoid_titles=["Neon Rain", "neon rain II"])
+    assert plan.title == "Neon Rain III"

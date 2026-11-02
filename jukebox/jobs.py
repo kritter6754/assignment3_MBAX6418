@@ -120,7 +120,7 @@ class JobManager:
         folder.mkdir(parents=True, exist_ok=True)
 
         def do_plan():
-            job.plan = plan_song(self.svc, req)
+            job.plan = plan_song(self.svc, req, avoid_titles=[t["title"] for t in self.lib.list()])
 
         def do_cover():
             save_cover(self.svc.image(job.plan.cover_prompt), folder)
