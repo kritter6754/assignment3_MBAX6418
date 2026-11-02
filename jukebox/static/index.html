@@ -38,6 +38,15 @@
       <section class="card">
         <h2>Create a song</h2>
         <form id="gen-form">
+          <div class="row2 top">
+            <label>Song name
+              <input id="title" maxlength="60" placeholder="e.g. Neon Nights">
+            </label>
+            <label>Theme <span class="muted">(optional)</span>
+              <input id="theme" maxlength="300" placeholder="e.g. a night drive">
+            </label>
+          </div>
+          <label class="check-line"><input id="title-auto" type="checkbox"> Can't think of a song name, click the box!</label>
           <div class="row2">
             <label>Style
               <span class="style-field">
@@ -51,9 +60,6 @@
               <datalist id="mood-list"></datalist>
             </label>
           </div>
-          <label>Theme <span class="muted">(optional)</span>
-            <input id="theme" maxlength="300" placeholder="e.g. a midnight drive along the coast">
-          </label>
           <div class="seg" role="radiogroup" aria-label="Track type">
             <span>Track type</span>
             <label><input type="radio" name="kind" value="vocal" checked> Vocal (AI lyrics)</label>

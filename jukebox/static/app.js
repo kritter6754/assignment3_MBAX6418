@@ -613,8 +613,16 @@ async function submitGenerate(ev) {
     ($("style-pick").value === CUSTOM_STYLE ? $("style") : $("style-pick")).focus();
     return;
   }
+  const autoTitle = $("title-auto").checked;
+  const title = autoTitle ? "" : $("title").value.trim();
+  if (!autoTitle && !title) {
+    err.textContent = "Name the song, or tick the box to let the AI name it.";
+    err.hidden = false;
+    $("title").focus();
+    return;
+  }
   const body = {
-    style: $("style").value.trim(), mood: $("mood").value.trim(), theme: $("theme").value.trim(),
+    title, style: $("style").value.trim(), mood: $("mood").value.trim(), theme: $("theme").value.trim(),
     duration_s: Number($("duration").value), vocal, language: $("language").value,
   };
   $("gen-btn").disabled = true;
@@ -777,6 +785,12 @@ async function init() {
     banner.classList.add("bad"); banner.hidden = false;
   }
 
+  // Ticking "Can't think of a song name" hands the naming to the AI and disables the name field.
+  $("title-auto").addEventListener("change", () => {
+    $("title").disabled = $("title-auto").checked;
+    $("title").placeholder = $("title-auto").checked ? "The AI will name it" : "e.g. Neon Nights";
+    if (!$("title-auto").checked) $("title").focus();
+  });
   $("duration").addEventListener("input", () => { $("duration-out").textContent = `${$("duration").value} s`; });
   document.querySelectorAll("input[name=kind]").forEach((r) => r.addEventListener("change", () => {
     $("lang-row").hidden = document.querySelector("input[name=kind]:checked").value !== "vocal";

@@ -10,6 +10,7 @@ LANGUAGES = {"en": "English", "es": "Spanish", "fr": "French", "de": "German",
              "it": "Italian", "pt": "Portuguese", "ja": "Japanese", "ko": "Korean", "zh": "Chinese"}
 
 MIN_DURATION, MAX_DURATION = 15, 240
+MAX_TITLE = 60
 INSTRUMENTAL = "[Instrumental]"
 
 
@@ -21,8 +22,12 @@ class SongRequest:
     vocal: bool
     theme: str = ""
     language: str = "en"
+    title: str = ""  # the user's song name; empty = let Qwen choose one
 
     def validate(self) -> None:
+        self.title = " ".join(self.title.split())
+        if len(self.title) > MAX_TITLE:
+            raise ValueError(f"The song name can be at most {MAX_TITLE} characters.")
         self.style = self.style.strip()[:80]
         self.mood = self.mood.strip()[:80]
         self.theme = self.theme.strip()[:300]
@@ -95,6 +100,11 @@ def plan_song(svc: Services, req: SongRequest, avoid_titles: list[str] | None = 
     if avoid_titles:
         avoid = ("\nThese titles already exist in the library; choose a different one: "
                  + "; ".join(avoid_titles[-60:]) + ".")
+    if req.title:
+        title_rule = (f'exactly "{req.title}" (the user chose this name). Let the lyrics, summary and '
+                      "cover reflect it.")
+    else:
+        title_rule = f"a short, original song title (2-5 words, no quotes).{avoid}"
     if req.vocal:
         lyric_rule = (f"Write ORIGINAL lyrics in {lang} with {_lyric_shape(req.duration_s)}. "
                       "Mark sections with tags on their own line: [Verse], [Chorus], [Bridge]. "
@@ -106,12 +116,13 @@ def plan_song(svc: Services, req: SongRequest, avoid_titles: list[str] | None = 
 
 Style/genre: {req.style}
 Mood: {req.mood}
+Song name: {req.title or "(not chosen yet; you choose it)"}
 Theme or topic: {theme}
 Length: about {req.duration_s} seconds
 Vocals: {"yes, sung in " + lang if req.vocal else "none (instrumental)"}
 
 Return JSON with:
-- "title": a short, original song title (2-5 words, no quotes).{avoid}
+- "title": {title_rule}
 - "summary": one sentence describing what the song is about and how it feels.
 - "caption": a comma-separated music description for the generator: genre, sub-genre, 3-4 lead
   instruments, mood words, tempo feel, and {"the vocal type (e.g. warm female vocal)" if req.vocal else "'instrumental, no vocals'"}.
@@ -123,7 +134,9 @@ Return JSON with:
     data = extract_json(svc.chat([{"role": "user", "content": prompt}], schema=_PLAN_SCHEMA))
     title = _clean_line(str(data.get("title") or f"{req.mood.title()} {req.style.title()}"))[:56]
     taken = {t.lower() for t in avoid_titles or []}
-    if title.lower() in taken:  # the model ignored the list: keep titles unique anyway
+    if req.title:
+        title = req.title  # the user's name is used exactly, even if another song has it
+    elif title.lower() in taken:  # the model ignored the list: keep titles unique anyway
         n = 2
         while f"{title} {_roman(n)}".lower() in taken:
             n += 1

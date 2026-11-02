@@ -215,3 +215,14 @@ def test_unfinished_song_folders_removed_at_startup(tmp_path, samples_dir, mock_
     with TestClient(create_app(settings, mock_services, samples_dir=samples_dir)) as c:
         assert len(c.get("/api/tracks").json()) == 1
     assert not leftover.exists()
+
+
+def test_user_song_name_is_used_exactly(client, mock_services):
+    job = wait_job(client, client.post("/api/generate", json={**SONG, "title": "  My   Own  Song "}).json()["id"])
+    assert job["title"] == "My Own Song"
+    track = next(t for t in client.get("/api/tracks").json() if t["id"] == job["track_id"])
+    assert track["title"] == "My Own Song"
+    prompt = next(a for n, a in mock_services.calls if n == "chat")
+    assert 'exactly "My Own Song"' in prompt
+    r = client.post("/api/generate", json={**SONG, "title": "x" * 61})
+    assert r.status_code == 400 and "song name" in r.json()["detail"]

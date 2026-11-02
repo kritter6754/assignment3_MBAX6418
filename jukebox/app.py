@@ -52,6 +52,7 @@ class GenerateBody(BaseModel):
     vocal: bool = True
     theme: str = Field(default="", max_length=300)
     language: str = "en"
+    title: str = Field(default="", max_length=200)  # trimmed and checked (max 60) in SongRequest
 
 
 class PlaylistBody(BaseModel):
@@ -129,6 +130,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
             "theme": "The theme can be at most 300 characters.",
             "duration_s": f"Duration must be a whole number of seconds between {MIN_DURATION} and {MAX_DURATION}.",
             "vocal": "Choose vocal or instrumental.",
+            "title": "The song name can be at most 60 characters.",
             "name": "Give the playlist a name (up to 40 characters).",
             "track_ids": "That list of songs is not valid.",
             "next_id": "Choose a song for the DJ to introduce.",

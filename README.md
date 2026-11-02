@@ -122,6 +122,7 @@ Then open http://localhost:8080. The `-v` option keeps generated songs and playl
 ## Using the app
 
 **1. Custom song generation** (Create a song, right column):
+- Type a **song name**, or tick **"Can't think of a song name, click the box!"** to let Qwen name it. A name you type is used exactly, and Qwen writes the lyrics and cover to fit it.
 - Pick a **style** from the dropdown (50 genres in 9 groups), or choose **Custom** to type any style.
 - Type a **mood**, and optionally a **theme**.
 - Choose **Vocal** (Qwen writes original lyrics in the language you pick) or **Instrumental**, and set the **duration** (15–240 s).

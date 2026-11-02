@@ -41,7 +41,7 @@ class Job:
         return {
             "id": self.id, "status": self.status, "error": self.error,
             "steps": [{"key": k, "label": STEP_LABELS[k], "state": v} for k, v in self.steps.items()],
-            "title": self.plan.title if self.plan else None,
+            "title": self.plan.title if self.plan else (self.request.title or None),
             "request": asdict(self.request), "track_id": self.track_id,
             "elapsed_s": round(self.updated_at - self.created_at),
         }
