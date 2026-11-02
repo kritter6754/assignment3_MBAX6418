@@ -184,6 +184,31 @@ _TODO: record inputs, expected and actual results for each core feature and at l
 | 4 | AI DJ (uploaded voice) | | | | not yet run |
 | 5 | Failure case | | | | not yet run |
 
+### Bugs found during testing
+
+Every bug below was found by running the app against the live class services, by a stress test, or by a browser test. The **How found** column says which. Each one is fixed in the current code, and a regression test now covers most of them (`uv run pytest`).
+
+| # | Bug | How found | Cause | Fix |
+|---|---|---|---|---|
+| 1 | **Lyrics with no line breaks.** 2 of 24 vocal songs had their whole song in one run-on string (`[Verse]Golden light spills across the sand,Waves whisper soft…`). The lyrics card showed one giant line, and ACE-Step got no line structure. | 40-song stress test | Qwen occasionally drops the newline characters inside the JSON `lyrics` field. | `normalize_lyrics()` puts section tags on their own lines and splits lines where punctuation runs straight into a capital letter. The prompt now asks for one line per row. The repair also runs when older songs are displayed, so the two affected songs now show 32 and 41 lines. |
+| 2 | **Repeated song titles.** 3 titles appeared twice among 40 songs ("Neon Horizon", "Sepia Memories", "Golden Hour Glow"). | 40-song stress test | Each song is planned independently, so songs with the same theme got the same title. | Qwen now receives the titles already in the library and is told to pick a new one. If it still repeats one, the app adds "II", "III", and so on. A retest with the theme that caused repeats produced a new title. |
+| 3 | **DJ voice upload rejected (HTTP 400).** | First live test against Chatterbox | The request format was guessed before we had the service's documentation (wrong field names and model id). | Matched the format in the service's published API description: model `chatterbox-v3`, `language_id`, and a multipart `file` + `request` upload. Verified with a live call. |
+| 4 | **DJ broke when the Chatterbox URL had no `/v1`.** The class endpoints file lists `http://…:9008` without it. | Comparing `class-endpoints.txt` with the working settings | The app built `/audio/speech` onto the URL as given, which needs the `/v1` prefix. | All service URLs are normalised. They work with or without `/v1`, and spaces are ignored. The app can also read `class-endpoints.txt` directly. |
+| 5 | **Song generation hung for 3 minutes, then failed** on a hosted copy. | Testing the Railway deployment | Its settings still held the `example.com` placeholder URLs from `.env.example`, so every connection attempt waited until it timed out. | Connection attempts now give up after 10 s, and the error names the host it tried to reach. Unedited placeholders are treated as "not set". `/api/status` and the startup check show which services the app can reach. |
+| 6 | **Error messages said only "HTTP 400"**, not why. | The same deployment, when an old model name was set | Only the status code was shown. | Errors now include the service's own explanation, e.g. "Input should be 'chatterbox-v3'". |
+| 7 | **The DJ invented a song.** Introducing the first song, it promised a "Midnight Drive" that didn't exist. | Reading DJ scripts in a live check | The intro prompt didn't forbid naming other songs. | The prompt now says the next song is the only one the DJ knows about and that it must never invent titles. Rechecked live. |
+| 8 | **Empty style dropdown after an update.** | Our own browser, right after a deploy | The browser reused a cached old `app.js` with the new page, and the old script crashed before filling the list (`c.styles is not iterable`). | `app.js` and `style.css` are now loaded with a version tag based on their contents, so every change forces a fresh download. Verified by feeding a browser the old cached script. |
+| 9 | **Server log errors** (`TypeError: %d format`). | Live end-to-end run | The filter that scrubs the API key from logs turned numeric log values into text. | Only text values are scrubbed now. |
+
+### Known limitations (not fixed)
+
+- **Lyric timing is estimated.** ACE-Step returns no timing data, and none of the class services can recover it from the audio. The lyrics card spreads the lines over the song's length and labels this "timing estimated". Clicking a line jumps there, which also works as a manual resync. We have not measured how closely the estimate follows the singing.
+- **One shared library.** Generated songs and playlists are shared by everyone using the same running app. Only voice uploads are private to each browser.
+- **The hosted (Railway) copy has no persistent storage**, so its generated songs and playlists reset on every redeploy. A local install keeps them in `data/`.
+- **Not tested:** the musical quality of every generated song by ear, and several people generating at the same time.
+
+The full stress-test numbers are in [docs/stress-test.md](docs/stress-test.md).
+
 ## Design judgment
 
 _TODO (team, in your own words, with evidence from testing):_
