@@ -338,8 +338,11 @@ def main() -> None:
     else:
         log.info("Checking the class services...")
         threading.Thread(target=_report_services, args=(services,), daemon=True).start()
-    log.info("AI Jukebox: open http://%s:%d in your browser (Ctrl+C to stop)",
-             "localhost" if host in ("127.0.0.1", "0.0.0.0") else host, port)
+    url = f"http://{'localhost' if host in ('127.0.0.1', '0.0.0.0') else host}:{port}"
+    log.info("AI Jukebox: open %s in your browser (Ctrl+C to stop)", url)
+    if os.environ.get("OPEN_BROWSER", "").strip().lower() in ("1", "true", "yes"):
+        import webbrowser
+        threading.Timer(2.0, webbrowser.open, args=(url,)).start()  # the launchers set OPEN_BROWSER=1
     uvicorn.run(create_app(settings, services), host=host, port=port, log_level="info")
 
 

@@ -20,8 +20,10 @@ _SECRETS: set[str] = set()
 
 
 def register_secret(value: str) -> None:
-    if value and len(value) >= 6:
-        _SECRETS.add(value)
+    # Short keys are scrubbed too (the class key is only a few characters long); 4 is the floor so
+    # that scrubbing cannot turn into replacing single letters or digits everywhere.
+    if value and len(value.strip()) >= 4:
+        _SECRETS.add(value.strip())
 
 
 def redact(text: str) -> str:

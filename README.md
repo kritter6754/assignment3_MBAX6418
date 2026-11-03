@@ -12,6 +12,22 @@ library with an AI DJ who talks between tracks. All of it runs on the class serv
 
 No paid services are used, and port 9000 is not used.
 
+**Contents:** [Quick start](#quick-start-launch-procedure) · [Setup and use](#setup-and-use) (dependencies, configuration, launch) · [Using the app](#using-the-app) · [Sample generation](#sample-generation) · [Tests](#tests) · [Key problem: endpoints](#key-problem-connecting-to-the-correct-endpoints) · [Design judgment](#design-judgment) · [Screenshots](#screenshots)
+
+## Quick start (launch procedure)
+
+1. **Get the code.** Download the ZIP from GitHub and extract it, or clone the repository.
+2. **Add the endpoints.** Copy the class's `class-endpoints.txt` into the extracted folder, next to `README.md`.
+3. **Start it with the launcher:**
+   - macOS / Linux: open a terminal in the folder and run `bash start.sh`
+   - Windows: double-click `start.bat`
+4. **Paste the class API key** when the launcher asks. This happens only on the first run; the key is saved in `.env` and never uploaded.
+5. The launcher installs everything (about a minute the first time), checks the four class services, and **opens http://localhost:8000**. The terminal should show four `OK` lines.
+
+To stop the app press **Ctrl+C** in the terminal. To start it again, run the launcher again; it remembers the key and starts in seconds. Your songs and playlists are kept in `data/`.
+
+The launcher uses [uv](https://docs.astral.sh/uv/) if it is installed, and otherwise Python 3.12+ with pip. To do the same steps by hand, see [Launch by hand](#launch-by-hand).
+
 ## How it works
 
 ```
@@ -33,29 +49,50 @@ Voice upload ─────────── POST /api/voice ─▶ DATA_DIR/v
 - **Commentary is ready on time:** the DJ clip for the next transition is requested as soon as a song starts.
 - **Credentials stay server-side:** the API key and service URLs never reach the browser, and `redact()` scrubs the key from logs and error messages.
 
-## Setup (run it on your own computer)
+## Setup and use
 
-**You need:** Python 3.12 or newer, and internet access to the class services. [uv](https://docs.astral.sh/uv/) is recommended, but plain `pip` also works. No other software is needed (no ffmpeg, no Node, no Docker).
+### Dependencies and additional software
 
-### 1. Get the code
+| What | Details |
+|---|---|
+| Python | 3.12 or newer. Tested with 3.12 (uv) and 3.13 (pip) on macOS. |
+| Package installer | [uv](https://docs.astral.sh/uv/) (recommended), or the `pip` that comes with Python |
+| Python packages | `fastapi`, `uvicorn`, `httpx`, `python-dotenv`, `pillow`, `python-multipart`, `mutagen`. Exact versions are pinned in `uv.lock` and `requirements.txt`, and installed automatically. |
+| Other software | **None.** No ffmpeg, Node.js, database or Docker. Any modern web browser works. |
+| Network | Access to the class services (ports 9001, 9006, 9007, 9008) |
 
-Download the ZIP from GitHub and extract it, or `git clone` the repository. Open a terminal **in the extracted folder** (the one containing `README.md`).
+### Configuration (endpoints and credentials)
 
-### 2. Supply the class credentials
+Launching *runs* the app. Configuration *tells* the app which class services to call and gives it the key. The app needs five settings:
 
-The app reads credentials only on the server side. Your browser never sees them.
+| Setting | What it is | Example (placeholder) |
+|---|---|---|
+| `CLASS_API_KEY` | The class API key. Required. | `replace-me` |
+| `LLM_BASE_URL` | Qwen, text (port 9001) | `http://example.com:9001/v1` |
+| `IMAGE_BASE_URL` | FLUX, cover art (port 9006) | `http://example.com:9006/v1` |
+| `MUSIC_BASE_URL` | ACE-Step, music (port 9007) | `http://example.com:9007` |
+| `TTS_BASE_URL` | Chatterbox, DJ voice (port 9008) | `http://example.com:9008/v1` |
 
-1. Copy the example settings file:
-   - macOS/Linux: `cp .env.example .env`
-   - Windows: `copy .env.example .env`
-2. Open `.env` in a text editor and set `CLASS_API_KEY=` to the class key.
-3. Give the app the four service URLs. Either:
-   - **easiest:** put the class's `class-endpoints.txt` into this folder. The app reads the Qwen (9001), FLUX (9006), ACE-Step (9007) and Chatterbox (9008) URLs from it, or
-   - fill in `LLM_BASE_URL`, `IMAGE_BASE_URL`, `MUSIC_BASE_URL` and `TTS_BASE_URL` in `.env`.
+**Where the settings come from**, highest priority first:
+1. Environment variables.
+2. `.env` in the project folder.
+3. `class-endpoints.txt` in the project folder.
 
-URLs work with or without a trailing `/v1`, and spaces around them are ignored. Values in `.env` take priority over `class-endpoints.txt`. Unedited `example.com` placeholders count as "not set", so they never hide the real URLs. Both `.env` and `class-endpoints.txt` are git-ignored.
+The easiest setup is to put the key in `.env` (the launcher does this for you) and drop in the class's `class-endpoints.txt` for the four URLs.
 
-Example `.env` (placeholders, not real values):
+**The app forgives common mistakes:**
+- URLs work with or without a trailing `/v1`, and spaces around values are ignored.
+- Unedited `example.com` placeholders count as "not set", so they never hide the real URLs.
+- Other common names are accepted, e.g. `SPEECH_BASE_URL` or `FLUX_BASE_URL` for the URLs and `API_KEY` for the key. Any other `…_URL` setting is matched to its service by its port.
+- The model names have correct defaults and normally need no setting.
+
+**Supplying the key securely:**
+- The key lives only in `.env` (or an environment variable) on the computer that runs the app.
+- `.env` and `class-endpoints.txt` are git-ignored, so they never go to GitHub or into the GitHub ZIP.
+- The browser never receives the key or the service URLs.
+- The key is scrubbed from logs and error messages.
+
+**Example `.env`** (placeholders, no credentials; the same as `.env.example`):
 
 ```ini
 CLASS_API_KEY=replace-me
@@ -64,27 +101,46 @@ LLM_BASE_URL=http://example.com:9001/v1
 IMAGE_BASE_URL=http://example.com:9006/v1
 MUSIC_BASE_URL=http://example.com:9007
 TTS_BASE_URL=http://example.com:9008/v1
+# Optional:
+# PORT=8000              # web address port (default 8000)
+# DATA_DIR=data          # where songs, covers and playlists are saved
+# APP_PASSWORD=          # ask for a password before using the app
 ```
 
-### 3. Install and start
+**Example `class-endpoints.txt`** (the format of the class file; placeholders):
 
-With uv:
-
-```bash
-uv sync              # installs the exact dependency versions from uv.lock
-uv run ai-jukebox    # starts the app
+```ini
+LLM_BASE_URL= http://example.com:9001/v1
+IMAGE_BASE_URL= http://example.com:9006/v1
+MUSIC_BASE_URL= http://example.com:9007
+TTS_BASE_URL= http://example.com:9008
 ```
 
-Without uv:
+If something is missing, the app still starts and plays the sample songs. A red banner and the terminal then name the missing settings, and generation and the DJ stay off until they are added.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python -m jukebox                  # starts the app
-```
+### Launch by hand
 
-Then open **http://localhost:8000**. On startup, the terminal checks each class service:
+These are the same steps the launchers perform:
+
+1. In the project folder, copy `.env.example` to `.env` (Windows: `copy .env.example .env`) and set `CLASS_API_KEY`.
+2. Put `class-endpoints.txt` in the folder, or fill in the four URLs in `.env`.
+3. Install and start. With uv:
+
+   ```bash
+   uv sync              # installs the exact dependency versions from uv.lock
+   uv run ai-jukebox    # starts the app
+   ```
+
+   Without uv:
+
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate          # Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   python -m jukebox                  # starts the app
+   ```
+
+4. Open **http://localhost:8000**. On startup, the terminal checks each class service:
 
 ```
 INFO jukebox: Checking the class services...
@@ -119,6 +175,8 @@ Then open http://localhost:8080. The `-v` option keeps generated songs and playl
 
 ## Using the app
 
+This section is also the recipe for exercising the three core features.
+
 **1. Custom song generation** (Create a song, right column):
 - Type a **song name**, or tick **"Can't think of a song name, click the box!"** to let Qwen name it. A name you type is used exactly, and Qwen writes the lyrics and cover to fit it.
 - Pick a **style** from the dropdown (50 genres in 9 groups), or choose **Custom** to type any style.
@@ -137,7 +195,8 @@ Then open http://localhost:8080. The `-v` option keeps generated songs and playl
 
 **Player and library:**
 - **⏮ / ▶⏸ / ⏭:** rewind restarts the song, or goes to the previous song if pressed in its first 3 seconds. Play/pause also works with the space bar. Skip goes to the DJ break, then the next song.
-- **Card buttons:** the ▶ on a song card turns into ⏸ while that song plays. Cards also have **+ Queue**, **Lyrics/Details**, and 🗂 (add to playlist).
+- **Card buttons:** the ▶ on a song card turns into ⏸ while that song plays. Cards also have **+ Queue**, **Lyrics/Details**, 🗂 (add to playlist) and ⬇ (download).
+- **Downloading songs:** ⬇ on a song card, in the player, in the lyrics window, or on a finished job in Generation status saves the song as `<Song title>.mp3`. The MP3 carries the title, genre, lyrics and cover art, so music apps show them.
 - **Playlists:** **+ Create Playlist** makes a named folder and lets you pick its songs. The chips above the library switch between **All songs** and each playlist, and **▶ Play all** plays what is shown. **✎ Edit** renames a playlist or changes its songs, and **🗑 Delete** removes it (the songs stay in the library).
 - **Lyrics card:** follows the playing song and highlights the current line. Click any line to jump there. ACE-Step returns no timing data, so line times are **estimated** from the song's length (see Design judgment).
 
@@ -146,9 +205,15 @@ Then open http://localhost:8080. The `-v` option keeps generated songs and playl
 - **DJ failure or timeout:** a message explains it, and playback continues with the next song.
 - **Unusable voice upload:** the DJ falls back to the default voice and says so.
 
-## Sample songs
+## Sample generation
 
-`assets/samples/` holds three ready-to-play songs generated in advance with the class endpoints by `scripts/generate_samples.py`. The script uses the same pipeline as the app. Each sample's `meta.json` records:
+`assets/samples/` holds three ready-to-play songs, generated in advance with the class endpoints by `scripts/generate_samples.py`. The script uses the same pipeline as the app:
+
+1. **Plan, title and lyrics (Qwen, 9001).** From the style, mood, theme and length, Qwen writes a title, a one-line summary, a music description for ACE-Step (genre, instruments, tempo, vocal type), and a cover prompt. For vocal songs it also writes original lyrics with [Verse]/[Chorus] tags, told not to imitate existing songs or artists. For instrumentals, the lyrics are set to `[Instrumental]`.
+2. **Cover (FLUX, 9006).** FLUX paints the cover from Qwen's prompt, which always ends with "no text, no lettering". The cover is saved as a 768×768 JPEG.
+3. **Music (ACE-Step, 9007).** ACE-Step generates the song from the music description and the lyrics at the requested length, as an MP3.
+
+Each sample's `meta.json` records:
 
 - the inputs (style, mood, theme, duration, vocal or instrumental)
 - the lyrics Qwen generated
@@ -208,13 +273,15 @@ The automated tests replace the class services with mocks, so they run without n
 | 16 | Safeguard: credentials | Searched the page, scripts, API responses, server logs and the ZIP for the key | Key appears nowhere outside the server's `.env` | Not found in the page, scripts, any API response or the server logs. The ZIP has no `.env`. | Pass |
 | 17 | Safeguard: voice privacy | Tried to download an uploaded voice by 6 different URL tricks; checked from a second browser | Uploads are private and not downloadable | All 6 returned 404. The second browser saw no uploaded voice. **Use default** deleted the file. | Pass |
 | 18 | Setup from the GitHub ZIP | Fresh download, README steps only, `class-endpoints.txt` dropped into the folder | Starts, and the startup check shows all four services OK | Worked with uv (Python 3.12) and with pip (Python 3.13) | Pass |
+| 19 | Launcher `start.sh` (2026-11-02) | Clean copy with no `.env`; key typed at the prompt; run once with uv and once with uv hidden (pip route); then run again | Asks for the key once, installs, starts, all services OK; the second run asks nothing | Both routes: created `.env`, saved the key, started, four `OK` lines. The second run started in seconds without asking. | Pass (`start.bat` not run; see below) |
+| 20 | Song download (2026-11-02) | ⬇ on a card, in the player, in the lyrics window, and on a newly generated song's job | An MP3 named after the song, with tags | `Golden Hour Drive.mp3`, `Rainy Pages.mp3`, `Neon Horizon Cruise.mp3`, `Download Test Song.mp3` (20.0 s). All carried title, genre and cover art, plus lyrics for vocal songs. | Pass |
 
 **Claims not yet checked:**
 - The musical quality of every song, judged by ear.
 - Whether the DJ really sounds like an uploaded voice.
 - How closely the estimated lyric timing follows the singing.
 - Several people using one copy of the app at once.
-- Windows. All tests ran on macOS.
+- Windows. All tests ran on macOS, so `start.bat` has not been run.
 - A teammate's full run of all three features from the ZIP on their own computer. Their first attempt found bug 14, which is fixed; the re-run is still to be done.
 
 ### Generation speed (measured)
@@ -320,9 +387,25 @@ The first 8 songs came in slowly, with gaps of up to about 50 s, before speeding
 
 </details>
 
-### Bugs found during testing
+### Key problem: connecting to the correct endpoints
 
-Each bug below was found by running the app against the live class services, by a stress test, or by a browser test. The **How found** column says which. Each one is fixed in the current code, and a regression test now covers most of them (`uv run pytest`).
+The models themselves worked from the first live call. **The hard part was getting the app connected to the right class endpoints, with the right request formats and settings, on every computer that ran it.** A wrong endpoint always looks the same to a user: "it doesn't work". Here is how that problem showed up and what we changed:
+
+1. **Request formats (bug 3).** We started without the services' documentation. FLUX worked first time, but Chatterbox rejected the DJ's voice upload with HTTP 400 (wrong field names and model id). *Fix:* we read each service's published API description (`/openapi.json`) and confirmed every format with live calls.
+2. **URL shapes (bug 4).** The class endpoints file lists Chatterbox without `/v1`, but the speech service lives under `/v1`. *Fix:* the app normalises every URL, so it works with or without `/v1`, and it can read `class-endpoints.txt` directly.
+3. **Placeholder URLs (bug 5).** A deployment kept the `example.com` placeholders, and each request waited 3 minutes before failing. *Fix:* the app gives up after 10 s and names the host. Placeholders count as "not set". A startup check and `/api/status` show which services are reachable.
+4. **Wrong model names (bug 6).** An old model name produced an unexplained "HTTP 400". *Fix:* errors now include the service's own explanation, and the model settings are optional with correct defaults.
+5. **A misleading startup check (bug 10).** A wrong key was reported as a URL problem, and ACE-Step looked OK even with a bad key. *Fix:* each failure now gets a hint that matches its cause, and ACE-Step is checked through an address that requires the key.
+6. **Different setting names (bug 14).** A teammate installing from GitHub named the voice URL `SPEECH_BASE_URL`, and the app switched generation off with only a vague message. *Fix:* the app accepts common alternative names, matches unknown `…_URL` settings by port, and names any missing setting in the banner and the terminal.
+
+**Evidence that it is solved:**
+- Fresh installs from the GitHub ZIP connected first time with uv and with pip (tests 18–19).
+- A wrong key and an unreachable host both produce clear errors within 10 s (tests 11–12).
+- The teammate's original `.env` now works unchanged.
+
+### Problem log (every problem found; all fixed)
+
+Each problem below was found by running the app against the live class services, by a stress test, or by a browser test. The **How found** column says which. Each one is fixed in the current code, and a regression test now covers most of them (`uv run pytest`).
 
 | # | Bug | How found | Cause | Fix |
 |---|---|---|---|---|
@@ -351,10 +434,53 @@ The full stress-test numbers are in [docs/stress-test.md](docs/stress-test.md).
 
 ## Design judgment
 
-- **Important design choice — Single `<audio>` element with prefetched DJ transitions & parallel asset generation:**
-  We designed the browser player around a single HTML `<audio>` element that plays songs and DJ clips sequentially, while prefetching the upcoming DJ transition (`POST /api/dj`) as soon as a song starts playing. Because Qwen writes the script and Chatterbox synthesizes the audio in the background while the current track plays (taking ~3–5 seconds total), the transition clip is already cached when the song ends. Using a single audio element guarantees by construction that music and speech can never overlap (verified in Test 5 and Test 8 under 26 rapid skip/play/pause clicks). Similarly, during song creation, after Qwen finishes `plan_song` (~1.2–3.5 s), we run FLUX cover painting (about 2–4 s) and ACE-Step music generation in parallel threads, so the song is ready 8.3–22.0 s after pressing Generate. This saves about 2–4 seconds per song, and total generation time is set only by the slower music step (see [Generation speed](#generation-speed-measured)).
-- **Limitation and failure investigated — Configuration variable mismatch (`503 Service Unavailable`) & estimated lyric timing:**
-  During local setup and testing, we investigated why the app booted with the warning `"Class-service settings are missing"` and returned `503 Service Unavailable` on `POST /api/generate` even after `.env` was created. We found that configuring the speech endpoint as `SPEECH_BASE_URL` instead of the expected `TTS_BASE_URL` caused the startup check to mark credentials as incomplete and disable generation and the DJ. Switching the variable to `TTS_BASE_URL` (or placing `class-endpoints.txt` in the root folder so the app parses ports 9001, 9006, 9007, and 9008 automatically) immediately resolved the failure. We then changed the app so this cannot happen again: it now accepts `SPEECH_BASE_URL` and other common alternative names, and the banner and terminal name the exact setting that is missing (bug 14). We also investigated lyric synchronization: because ACE-Step 1.5 XL Turbo returns raw audio without word- or line-level timestamps, the app estimates line timing proportionally across the song's duration and allows users to click any lyric line to manually resync playback.
+**Important design choice: one `<audio>` element, prefetched DJ clips, and parallel cover and music generation.**
+- **One audio element:** the browser player plays songs and DJ clips one after another through a single HTML `<audio>` element. Music and speech therefore cannot overlap, by construction rather than by careful timing.
+- **Prefetched DJ clips:** as soon as a song starts, the app asks for the next DJ break (`POST /api/dj`). Qwen writes the script and Chatterbox speaks it while the song plays, which took about 4 s in our tests, so the clip is ready when the song ends.
+- **Parallel generation:** when a song is created, Qwen first plans it (1.2–3.5 s). FLUX then paints the cover (about 2–4 s) at the same time as ACE-Step composes the music, so the total time is set by the music alone: 8.3–22.0 s depending on length.
+
+*Evidence:*
+- In test 5 the queue played song, DJ, song, DJ, song automatically, never with two sounds at once, and each DJ break named both songs.
+- In test 8, 26 rapid clicks on skip, rewind and play/pause never produced overlapping audio.
+- The 40-song stress test finished 40/40 with no failures, with the app answering in about 9 ms while it worked.
+
+**Limitation or failure investigated: connecting to the correct endpoints.** This is the key problem described [above](#key-problem-connecting-to-the-correct-endpoints). The most instructive case came from a teammate's install. The app started but showed "Class-service settings are missing", and Generate returned `503 Service Unavailable` even though `.env` existed. We found that the voice URL had been named `SPEECH_BASE_URL` instead of `TTS_BASE_URL`. Renaming it, or dropping `class-endpoints.txt` into the folder, fixed it immediately.
+
+*What we learned:* the fragile part of this app is not the AI models but the path to them. People write settings in different ways, and a wrong endpoint looks the same as a broken app. So we made the app:
+- accept the ways people actually write the settings;
+- check every service when it starts;
+- name the exact setting or host that is wrong, in the terminal and on the page.
+
+A second limitation is still open: ACE-Step returns no lyric timing, so the lyrics card estimates when each line is sung (see [Known limitations](#known-limitations-not-fixed)).
+
+**Design edits made during development.** The core design held up from the first version, and the 40-song stress test and the requirement tests passed on it. The edits below added features or hardened setup; none replaced the core design.
+
+- *Kept from the first version:*
+  - a FastAPI server with a one-page player (not Gradio), because the player needs a real auto-advancing queue;
+  - all class-service calls on the server, so the key stays private;
+  - the single audio element with prefetched DJ clips;
+  - cover and music made in parallel;
+  - **Retry** that resumes at the failed step;
+  - an offline mock mode for the automated tests.
+- *Layout:* a two-column dashboard that fits on one screen, with output (library, generation status) on the left and controls on the right.
+- *Creating songs:*
+  - a style dropdown of 50 genres in 9 groups, plus a custom style;
+  - a song name field with a "Can't think of a song name, click the box!" option.
+- *Playing songs:*
+  - a rewind button;
+  - library play buttons that switch to pause and follow the player;
+  - playlists, as folders in the library;
+  - a live lyrics card that highlights the current line, with click-to-jump;
+  - song downloads as tagged MP3s.
+- *Quality fixes from testing:*
+  - repairing lyrics that come back without line breaks;
+  - keeping titles unique;
+  - stopping the DJ from inventing songs;
+  - plain-language error messages;
+  - telling the user when a restart lost a song in progress;
+  - making browsers always load the current version of the page's code.
+- *Setup and connection hardening:* the endpoint fixes in the key problem above, plus the one-step launchers (`start.sh`, `start.bat`) and a pip route.
+- *Deployment:* a temporary cloud copy was used only for team demos and then removed. The app is run locally, or optionally in Docker.
 
 ## Screenshots
 
@@ -389,6 +515,7 @@ jukebox/dj.py          DJ clips (cached, deduplicated) and voice uploads
 jukebox/library.py     samples + generated songs
 jukebox/playlists.py   playlists (library folders), saved in DATA_DIR
 jukebox/static/        single-page player (HTML/CSS/JS, no build step)
-scripts/               sample generation
+scripts/               sample generation, stress test, timing benchmark
 tests/                 pytest suite
+start.sh, start.bat    one-step launchers (macOS/Linux, Windows)
 ```

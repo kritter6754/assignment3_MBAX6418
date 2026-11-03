@@ -88,3 +88,9 @@ def test_unknown_url_name_matched_by_port(clean_env, tmp_path):
     env.write_text("CLASS_API_KEY=k-123456\nLLM_BASE_URL=http://h:9001/v1\nIMAGE_BASE_URL=http://h:9006/v1\n"
                    "MUSIC_BASE_URL=http://h:9007\nMY_DJ_VOICE_URL=http://h:9008/v1\n")
     assert load_settings(env_file=env).tts_url == "http://h:9008/v1"
+
+
+def test_short_keys_are_redacted():
+    from jukebox.config import redact, register_secret
+    register_secret("k9z4")
+    assert redact("HTTP 401 for key k9z4") == "HTTP 401 for key ***"
