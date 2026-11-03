@@ -16,17 +16,27 @@ No paid services are used, and port 9000 is not used.
 
 ## Quick start (launch procedure)
 
-1. **Get the code.** Download the ZIP from GitHub and extract it, or clone the repository.
-2. **Add the endpoints.** Copy the class's `class-endpoints.txt` into the extracted folder, next to `README.md`.
-3. **Start it with the launcher:**
-   - macOS / Linux: open a terminal in the folder and run `bash start.sh`
-   - Windows: double-click `start.bat`
-4. **The key.** The official `class-endpoints.txt` already contains the API key, so the launcher uses it and asks nothing. If your copy has no key, the launcher asks you to paste it once and saves it in `.env`. Neither file is ever uploaded.
-5. The launcher installs everything (about a minute the first time), checks the four class services, and **opens http://localhost:8000**. The terminal should show four `OK` lines.
+1. **Download the ZIP** from GitHub (**Code → Download ZIP**) onto your machine.
+2. **Extract all the files** into a single folder.
+3. **Add the class endpoints file.** Copy the class's `class-endpoints.txt` into that folder, next to `README.md`. The official file already contains the API key, so nothing else needs to be typed in.
+4. **Open a terminal in the folder:**
+   - macOS: right-click the folder and choose **New Terminal at Folder**.
+   - Windows 11: open the folder in File Explorer, right-click an empty spot and choose **Open in Terminal**.
+   - Windows 10: open the folder in File Explorer, click the address bar, type `cmd` and press Enter.
+5. **Run the launcher:**
+   - macOS / Linux: `bash start.sh`
+   - Windows: `start.bat` (or just double-click `start.bat` in File Explorer; no terminal needed)
+6. **If errors pop up, the most likely cause is the class endpoints.** This was the main issue we ran into (see [Key problem](#key-problem-connecting-to-the-correct-endpoints)). Where to look:
+   - The terminal prints an `OK` or `FAIL` line for each of the four services, with a hint such as "key rejected" or "cannot connect".
+   - The page shows a red banner naming any missing setting.
+   - The [Troubleshooting](#troubleshooting) table lists the fixes.
+   - You can also paste the terminal message into Claude, Hermes, ChatGPT or another assistant and work through connecting the endpoints together.
 
-To stop the app press **Ctrl+C** in the terminal. To start it again, run the launcher again; it remembers the key and starts in seconds. Your songs and playlists are kept in `data/`.
+   Once the endpoints are connected, repeat steps 4–5.
+7. **Let the terminal run.** The first run installs everything, which takes about a minute. The terminal then shows the local link (**http://localhost:8000**) and opens it in your default browser.
+8. **Enjoy producing music!** To stop the app, press **Ctrl+C** in the terminal. To start it again, repeat steps 4–5; later starts take a few seconds.
 
-The launcher uses [uv](https://docs.astral.sh/uv/) if it is installed, and otherwise Python 3.12+ with pip. To do the same steps by hand, see [Launch by hand](#launch-by-hand).
+If `class-endpoints.txt` has no key, the launcher asks you to paste it once and saves it in `.env`. Neither file is ever uploaded. The launcher uses [uv](https://docs.astral.sh/uv/) if it is installed, and otherwise Python 3.12+ with pip. To do the same steps by hand, see [Launch by hand](#launch-by-hand).
 
 ## How it works
 
@@ -296,6 +306,7 @@ The automated tests replace the class services with mocks, so they run without n
 | 18 | Setup from the GitHub ZIP | Fresh download, README steps only, `class-endpoints.txt` dropped into the folder | Starts, and the startup check shows all four services OK | Worked with uv (Python 3.12) and with pip (Python 3.13) | Pass |
 | 19 | Launcher `start.sh` (2026-11-02) | Clean copy with no `.env`; key typed at the prompt; run once with uv and once with uv hidden (pip route); then run again | Asks for the key once, installs, starts, all services OK; the second run asks nothing | Both routes: created `.env`, saved the key, started, four `OK` lines. The second run started in seconds without asking. | Pass (`start.bat` not run; see below) |
 | 20 | Song download (2026-11-02) | ⬇ on a card, in the player, in the lyrics window, and on a newly generated song's job | An MP3 named after the song, with tags | `Golden Hour Drive.mp3`, `Rainy Pages.mp3`, `Neon Horizon Cruise.mp3`, `Download Test Song.mp3` (20.0 s). All carried title, genre and cover art, plus lyrics for vocal songs. | Pass |
+| 21 | Install by a team member from the ZIP (2026-11-02) | Jaikrit, macOS: GitHub ZIP of commit `8621e1a` extracted into a new folder (`final_assignment3_zip`) with the official `class-endpoints.txt`; terminal opened at the folder; `bash start.sh` | The app installs and starts from the folder alone, and opens in the browser | Worked. The launcher used the key from `class-endpoints.txt`, installed, started, and the app ran in the browser. His written steps became the Quick start above. | Pass |
 
 **Claims not yet checked:**
 - The musical quality of every song, judged by ear.
@@ -303,7 +314,7 @@ The automated tests replace the class services with mocks, so they run without n
 - How closely the estimated lyric timing follows the singing.
 - Several people using one copy of the app at once.
 - Windows. All tests ran on macOS, so `start.bat` has not been run.
-- A teammate's full run of all three features from the ZIP on their own computer. Their first attempt found bug 14, which is fixed; the re-run is still to be done.
+- A full run of all three features from the ZIP by a teammate other than the developer. Rocky's first attempt found bug 14, which is fixed; test 21 is a team member's successful install from the ZIP.
 
 ### Generation speed (measured)
 
