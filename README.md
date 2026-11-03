@@ -102,7 +102,7 @@ Stop the app with **Ctrl+C**. Songs, covers and playlists you create are saved i
 
 | What you see | What to do |
 |---|---|
-| Red banner "Class-service credentials missing" | `CLASS_API_KEY` or a service URL is not set. Check `.env`, or that `class-endpoints.txt` is in the same folder as `README.md`. Restart the app after editing. |
+| Red banner "Settings missing on the server (…)" | The banner and the terminal name the missing settings. Check `.env`, or that `class-endpoints.txt` is in the same folder as `README.md`. Other common names (e.g. `SPEECH_BASE_URL`, `FLUX_BASE_URL`, `API_KEY`) are also accepted, and any `…_URL` setting is matched to its service by port. Restart the app after editing. |
 | `FAIL` lines in the startup check | That service's URL is wrong or the service is down. The line names the host it tried. **http://localhost:8000/api/status** shows the same check. |
 | "address already in use" | Another program is using port 8000. Start with another port: `PORT=8001 uv run ai-jukebox` (Windows: `set PORT=8001` first). |
 | Generation fails with "rejected our credentials" | The key is wrong or expired. |
@@ -217,7 +217,7 @@ The automated tests replace the class services with mocks, so they run without n
 - How closely the estimated lyric timing follows the singing.
 - Several people using one copy of the app at once.
 - Windows. All tests ran on macOS.
-- A teammate installing from the ZIP on their own computer (still to be done).
+- A teammate's full run of all three features from the ZIP on their own computer. Their first attempt found bug 14, which is fixed; the re-run is still to be done.
 
 ### Generation speed (measured)
 
@@ -341,6 +341,7 @@ Each bug below was found by running the app against the live class services, by 
 | 11 | **A song in progress vanished silently** when the app restarted, and a half-finished song folder stayed on disk. | Requirement test (test 14) | Jobs live only in memory. Nothing told the browser a job was lost, and nothing cleaned up partial folders. | The page now says the song was lost and asks to generate it again. Unfinished folders are deleted when the app starts. |
 | 12 | **Technical error wording** for invalid input, such as "String should have at least 1 character". | Requirement test (test 13) | The web framework's default validation messages were passed through unchanged. | Messages now say what to fix, e.g. "Choose a style (up to 80 characters)." |
 | 13 | **A missing period in the DJ error message** ("…retry in a moment Continuing to the next song"). | Requirement test (test 10) | The message was joined without punctuation. | Punctuation is added when missing. |
+| 14 | **Generation and the DJ switched off after a teammate's setup**, with only "Class-service settings are missing" and `503` on Generate. | A teammate installing from GitHub | They named the voice URL `SPEECH_BASE_URL` in `.env`. The app only knew `TTS_BASE_URL`, and its message did not say which setting was missing. | The app now accepts common alternative names (`SPEECH_BASE_URL`, `VOICE_BASE_URL`, `FLUX_BASE_URL`, `QWEN_BASE_URL`, `ACESTEP_BASE_URL`, `API_KEY`, …) and matches any other `…_URL` setting to its service by port. The red banner and the terminal now list the exact settings that are missing and where to put them. Retested with the teammate's `.env`. |
 
 ### Known limitations (not fixed)
 

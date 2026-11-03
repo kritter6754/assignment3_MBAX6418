@@ -781,7 +781,8 @@ async function init() {
   const banner = $("banner");
   if (c.mock) { banner.textContent = "Mock mode: generated audio and art are placeholders"; banner.hidden = false; }
   else if (!c.configured) {
-    banner.textContent = "Class-service credentials missing on the server: samples play, generation and DJ are off";
+    const missing = (c.missing || []).map((m) => m.split(" ")[0]).join(", ");
+    banner.textContent = `Settings missing on the server (${missing || "credentials"}): samples play, but generation and the DJ are off. See the terminal and README.`;
     banner.classList.add("bad"); banner.hidden = false;
   }
 

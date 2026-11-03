@@ -5,7 +5,8 @@ import pytest
 
 from jukebox.config import api_base, load_settings
 
-KEYS = ("CLASS_API_KEY", "LLM_BASE_URL", "IMAGE_BASE_URL", "MUSIC_BASE_URL", "TTS_BASE_URL", "CLASS_ENDPOINTS_FILE")
+KEYS = ("CLASS_API_KEY", "LLM_BASE_URL", "IMAGE_BASE_URL", "MUSIC_BASE_URL", "TTS_BASE_URL", "CLASS_ENDPOINTS_FILE",
+        "SPEECH_BASE_URL", "FLUX_URL", "API_KEY", "MY_DJ_VOICE_URL")
 
 
 @pytest.fixture
@@ -70,3 +71,20 @@ def test_unedited_example_is_not_configured(clean_env, tmp_path):
     env = tmp_path / ".env"
     env.write_text((__import__("pathlib").Path(__file__).parent.parent / ".env.example").read_text())
     assert not load_settings(env_file=env).configured
+
+
+def test_alternative_setting_names(clean_env, tmp_path):
+    """A teammate named the voice URL SPEECH_BASE_URL; that must still configure the DJ."""
+    env = tmp_path / ".env"
+    env.write_text("API_KEY=k-123456\nLLM_BASE_URL=http://h:9001/v1\nFLUX_URL=http://h:9006/v1\n"
+                   "MUSIC_BASE_URL=http://h:9007\nSPEECH_BASE_URL=http://h:9008\n")
+    s = load_settings(env_file=env)
+    assert s.tts_url == "http://h:9008/v1" and s.image_url == "http://h:9006/v1"
+    assert s.api_key == "k-123456" and s.configured
+
+
+def test_unknown_url_name_matched_by_port(clean_env, tmp_path):
+    env = tmp_path / ".env"
+    env.write_text("CLASS_API_KEY=k-123456\nLLM_BASE_URL=http://h:9001/v1\nIMAGE_BASE_URL=http://h:9006/v1\n"
+                   "MUSIC_BASE_URL=http://h:9007\nMY_DJ_VOICE_URL=http://h:9008/v1\n")
+    assert load_settings(env_file=env).tts_url == "http://h:9008/v1"

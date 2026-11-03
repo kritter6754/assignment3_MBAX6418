@@ -157,7 +157,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
 
     @app.get("/api/config")
     def config():
-        return {"configured": settings.configured, "mock": settings.mock,
+        return {"configured": settings.configured, "mock": settings.mock, "missing": settings.missing,
                 "style_groups": STYLE_GROUPS, "moods": MOODS, "languages": LANGUAGES,
                 "min_duration": MIN_DURATION, "max_duration": MAX_DURATION}
 
@@ -315,8 +315,10 @@ def main() -> None:
     if settings.mock:
         log.warning("MOCK_SERVICES=true: songs, covers and DJ speech are FAKE placeholders.")
     elif not settings.configured:
-        log.warning("Class-service settings are missing (CLASS_API_KEY and the four service URLs; see README). "
-                    "Sample songs play, but generation and the DJ are disabled.")
+        from .config import PROJECT_ROOT
+        log.warning("Missing settings: %s. Put them in %s, or put class-endpoints.txt in %s (see README). "
+                    "Sample songs play, but generation and the DJ are disabled.",
+                    ", ".join(settings.missing), PROJECT_ROOT / ".env", PROJECT_ROOT)
     else:
         log.info("Checking the class services...")
         threading.Thread(target=_report_services, args=(services,), daemon=True).start()

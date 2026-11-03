@@ -129,7 +129,8 @@ def test_media_path_traversal_blocked(client):
 def test_unconfigured_server_still_plays_samples(tmp_path, samples_dir):
     app = create_app(make_settings(tmp_path, api_key=""), samples_dir=samples_dir)
     with TestClient(app) as c:
-        assert c.get("/api/config").json()["configured"] is False
+        cfg = c.get("/api/config").json()
+        assert cfg["configured"] is False and cfg["missing"] == ["CLASS_API_KEY"]
         assert len(c.get("/api/tracks").json()) == 1
         r = c.post("/api/generate", json=SONG)
         assert r.status_code == 503 and "CLASS_API_KEY" in r.json()["detail"]

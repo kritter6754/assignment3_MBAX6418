@@ -65,6 +65,16 @@ class Settings:
     music_timeout_s: float = 900.0
 
     @property
+    def missing(self) -> list[str]:
+        """Names of the settings still needed (empty when mock or fully configured)."""
+        if self.mock:
+            return []
+        need = {"CLASS_API_KEY": self.api_key, "LLM_BASE_URL (Qwen, 9001)": self.llm_url,
+                "IMAGE_BASE_URL (FLUX, 9006)": self.image_url, "MUSIC_BASE_URL (ACE-Step, 9007)": self.music_url,
+                "TTS_BASE_URL (Chatterbox, 9008)": self.tts_url}
+        return [name for name, value in need.items() if not value]
+
+    @property
     def configured(self) -> bool:
         if self.mock:
             return True
@@ -84,6 +94,36 @@ def _placeholder(value: str | None) -> bool:
 def _env(key: str, default: str = "") -> str:
     v = os.environ.get(key, "")
     return default if _placeholder(v) else v.strip()
+
+
+# Other names people use for the same settings (seen in practice: SPEECH_BASE_URL for the voice).
+ALIASES = {
+    "LLM_BASE_URL": ("TEXT_BASE_URL", "QWEN_BASE_URL", "CHAT_BASE_URL", "LLM_URL", "QWEN_URL"),
+    "IMAGE_BASE_URL": ("FLUX_BASE_URL", "COVER_BASE_URL", "IMAGE_URL", "FLUX_URL"),
+    "MUSIC_BASE_URL": ("ACESTEP_BASE_URL", "ACE_STEP_BASE_URL", "SONG_BASE_URL", "MUSIC_URL", "ACESTEP_URL"),
+    "TTS_BASE_URL": ("SPEECH_BASE_URL", "VOICE_BASE_URL", "CHATTERBOX_BASE_URL", "DJ_BASE_URL",
+                     "TTS_URL", "SPEECH_URL", "CHATTERBOX_URL"),
+    "CLASS_API_KEY": ("API_KEY", "CLASS_KEY", "OPENAI_API_KEY"),
+}
+
+
+def apply_setting_aliases() -> None:
+    """Fill each setting from an alternative name, or (for URLs) from any *_URL value whose port
+    belongs to that service, when the expected name is missing."""
+    for key, names in ALIASES.items():
+        if not _placeholder(os.environ.get(key)):
+            continue
+        for name in names:
+            if not _placeholder(os.environ.get(name)):
+                os.environ[key] = os.environ[name]
+                break
+    for name, value in list(os.environ.items()):
+        if not name.endswith("_URL") or _placeholder(value):
+            continue
+        m = re.search(r":(\d{4,5})(?:/|$)", value.strip())
+        key = ENV_FOR_PORT.get(int(m.group(1))) if m else None
+        if key and _placeholder(os.environ.get(key)):
+            os.environ[key] = value
 
 
 def load_endpoints_file(path: Path) -> None:
@@ -120,6 +160,7 @@ def api_base(url: str, v1: bool) -> str:
 
 def load_settings(env_file: str | os.PathLike | None = None) -> Settings:
     load_dotenv(env_file or PROJECT_ROOT / ".env", override=False)
+    apply_setting_aliases()
     load_endpoints_file(Path(os.environ.get("CLASS_ENDPOINTS_FILE", PROJECT_ROOT / "class-endpoints.txt")))
     e = os.environ.get
     data_dir = Path(e("DATA_DIR", "data"))
