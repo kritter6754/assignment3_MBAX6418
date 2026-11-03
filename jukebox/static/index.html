@@ -125,6 +125,7 @@
       <button id="btn-rewind" class="round ghost" aria-label="Rewind" title="Restart song (press twice for previous)">⏮</button>
       <button id="btn-play" class="round" aria-label="Play">▶</button>
       <button id="btn-skip" class="round ghost" aria-label="Skip" title="Skip">⏭</button>
+      <a id="btn-download" class="round ghost dl" href="#" download aria-label="Download the current song" hidden>⬇</a>
       <button id="btn-queue" class="btn small ghost" aria-label="Show queue">Queue <span id="queue-count">0</span></button>
     </div>
     <audio id="audio" preload="auto"></audio>
@@ -134,7 +135,7 @@
     <h3 id="lyrics-title"></h3>
     <p id="lyrics-meta" class="muted"></p>
     <pre id="lyrics-body"></pre>
-    <form method="dialog"><button class="btn">Close</button></form>
+    <form method="dialog" class="dlg-actions"><span id="lyrics-download"></span><button class="btn">Close</button></form>
   </dialog>
 
   <dialog id="pl-dlg" aria-labelledby="pl-dlg-title">

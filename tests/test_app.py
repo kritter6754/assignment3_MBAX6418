@@ -227,3 +227,32 @@ def test_user_song_name_is_used_exactly(client, mock_services):
     assert 'exactly "My Own Song"' in prompt
     r = client.post("/api/generate", json={**SONG, "title": "x" * 61})
     assert r.status_code == 400 and "song name" in r.json()["detail"]
+
+
+def test_download_mp3_has_name_and_tags(tmp_path, mock_services):
+    """Downloads are named after the song and carry title, genre, lyrics and cover art."""
+    import io
+    import json
+    import shutil
+    from pathlib import Path
+
+    from mutagen.id3 import ID3
+
+    real = Path(__file__).parent.parent / "assets" / "samples" / "02-golden-hour-drive"
+    samples = tmp_path / "samples" / "01-x"
+    samples.mkdir(parents=True)
+    for f in ("audio.mp3", "cover.jpg"):
+        shutil.copy(real / f, samples / f)
+    meta = json.loads((real / "meta.json").read_text())
+    (samples / "meta.json").write_text(json.dumps({**meta, "title": "Golden Hour: Drive?"}))
+    app = create_app(make_settings(tmp_path), mock_services, samples_dir=samples.parent)
+    with TestClient(app) as c:
+        r = c.get("/api/tracks/01-x/download")
+        assert r.status_code == 200 and r.headers["content-type"] == "audio/mpeg"
+        assert 'filename="Golden Hour Drive.mp3"' in r.headers["content-disposition"]
+        tags = ID3(io.BytesIO(r.content))
+        assert str(tags["TIT2"]) == "Golden Hour: Drive?" and str(tags["TCON"]) == "Indie pop"
+        assert tags.getall("APIC")[0].data == (samples / "cover.jpg").read_bytes()
+        assert "golden" in str(tags.getall("USLT")[0]).lower()
+        assert (samples / "audio.mp3").read_bytes() == (real / "audio.mp3").read_bytes()  # stored file untouched
+        assert c.get("/api/tracks/nope/download").status_code == 404

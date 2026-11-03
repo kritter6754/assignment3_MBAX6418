@@ -123,7 +123,8 @@ function renderLibrary() {
           el("button", { class: "btn small", onclick: () => enqueue(t.id) }, "+ Queue"),
           el("button", { class: "btn small ghost", onclick: () => showLyrics(t) }, t.vocal ? "Lyrics" : "Details"),
           el("button", { class: "btn small ghost icon", title: "Add to playlist", "aria-label": `Add ${t.title} to a playlist`,
-            onclick: () => openAddToPlaylist(t.id) }, "🗂")))));
+            onclick: () => openAddToPlaylist(t.id) }, "🗂"),
+          downloadLink(t, "btn small ghost icon")))));
   }
   syncPlayStates();
 }
@@ -262,10 +263,17 @@ async function togglePlaylistTrack(p, trackId, add, box) {
   }
 }
 
+// A link that saves the song as an MP3 named after its title (with title, lyrics and cover tags).
+function downloadLink(t, cls, label = "⬇") {
+  return el("a", { class: cls, href: `/api/tracks/${encodeURIComponent(t.id)}/download`, download: "",
+    title: `Download “${t.title}”`, "aria-label": `Download ${t.title}` }, label);
+}
+
 function showLyrics(t) {
   $("lyrics-title").textContent = t.title;
   $("lyrics-meta").textContent = [t.style, t.mood, t.theme, t.summary].filter(Boolean).join(" — ");
   $("lyrics-body").textContent = t.vocal ? t.lyrics : "Instrumental track (no lyrics).";
+  $("lyrics-download").replaceChildren(downloadLink(t, "btn", "⬇ Download song"));
   $("lyrics-dlg").showModal();
 }
 
@@ -431,6 +439,9 @@ function startSong(index) {
   state.phase = "song";
   setNowPlaying(t.title, `${t.style} · ${t.mood}${t.source === "sample" ? " · sample" : ""}`, t.cover_url, false);
   showSongLyrics(t);
+  $("btn-download").href = `/api/tracks/${encodeURIComponent(t.id)}/download`;
+  $("btn-download").title = `Download “${t.title}”`;
+  $("btn-download").hidden = false;
   renderQueue();
   renderLibrary();
   playSrc(t.audio_url, token).catch(() => {
@@ -666,8 +677,8 @@ async function pollJobs() {
     if (before && before !== "failed" && j.status === "failed") toast(`Generation failed: ${j.error}`, "err", 10000);
     state.jobsKnown.set(j.id, j.status);
   }
+  if (newDone) await loadTracks(); // first, so finished jobs can offer a download link
   renderJobs(jobs);
-  if (newDone) await loadTracks();
   if (jobs.some((j) => j.status === "queued" || j.status === "running")) pollTimer = setTimeout(pollJobs, 2000);
 }
 
@@ -690,6 +701,7 @@ function renderJobs(jobs) {
         j.status === "failed" ? el("button", { class: "btn small", onclick: () => retryJob(j.id) }, "↻ Retry") : null,
         j.status === "done" && j.track_id ? el("button", { class: "btn small", onclick: () => playNow(j.track_id) }, "▶ Play") : null,
         j.status === "done" && j.track_id ? el("button", { class: "btn small", onclick: () => enqueue(j.track_id) }, "+ Queue") : null,
+        j.status === "done" && track(j.track_id) ? downloadLink(track(j.track_id), "btn small", "⬇ Download") : null,
         j.status === "done" || j.status === "failed" ? el("button", { class: "btn small ghost", onclick: () => dismissJob(j.id) }, "Dismiss") : null)));
   }
 }

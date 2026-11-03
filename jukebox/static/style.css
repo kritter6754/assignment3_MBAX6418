@@ -67,7 +67,7 @@ label.inline input { width: 110px; margin-top: 0; }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: .75rem; }
 .section-head h2 { margin: 0; }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(195px, 1fr)); gap: 14px; align-content: start; grid-auto-rows: max-content; padding: 2px 4px 4px 2px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; align-content: start; grid-auto-rows: max-content; padding: 2px 4px 4px 2px; }
 .track { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
   display: flex; flex-direction: column; transition: border-color .15s, transform .15s; }
 .track:hover { border-color: #4b4170; transform: translateY(-2px); }
@@ -190,3 +190,8 @@ dialog pre { white-space: pre-wrap; font: inherit; max-height: 55vh; overflow: a
   background: var(--accent); margin: 0 8px 2px 0; vertical-align: middle; }
 .lyrics-live .ly-dj { font-weight: 600; line-height: 1.45; }
 .lyrics-live .ly-dj b { color: var(--accent-2); display: block; margin-bottom: 4px; }
+
+/* download links styled as buttons */
+a.btn, a.round { text-decoration: none; }
+.round.dl { display: inline-grid; place-items: center; font-size: 1.05rem; }
+@media (max-width: 600px) { #btn-download { display: none; } } /* phones: download from the song cards */

@@ -22,7 +22,7 @@ from .config import Settings, install_log_redaction, load_settings
 from .creative import LANGUAGES, MAX_DURATION, MIN_DURATION, SongRequest
 from .dj import DJ, VoiceStore
 from .jobs import JobManager
-from .library import Library
+from .library import Library, download_name, tagged_audio
 from .playlists import PlaylistStore
 from .services import ServiceError, Services, make_services
 
@@ -172,6 +172,22 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     @app.get("/api/tracks")
     def tracks():
         return [Library.public(t) for t in library.list()]
+
+    @app.get("/api/tracks/{track_id}/download")
+    def download_track(track_id: str):
+        """The song as a file to save: named after its title, with title/genre/lyrics/cover tags."""
+        track = library.get(track_id)
+        if track is None:
+            raise HTTPException(404, "That song is no longer in the library.")
+        ext = track["audio"].rsplit(".", 1)[-1].lower()
+        name = download_name(track.get("title", ""), ext)
+        ascii_name = name.encode("ascii", "ignore").decode() or f"song.{ext}"
+        from urllib.parse import quote
+        return Response(
+            tagged_audio(track, library.folder(track)),
+            media_type="audio/mpeg" if ext == "mp3" else f"audio/{ext}",
+            headers={"Content-Disposition": f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(name)}'},
+        )
 
     @app.post("/api/generate")
     def generate(body: GenerateBody):

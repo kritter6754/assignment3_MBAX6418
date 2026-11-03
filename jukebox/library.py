@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import shutil
 import threading
 import time
@@ -93,3 +94,43 @@ class Library:
         out["audio_url"] = f"{base}/{track['audio']}"
         out["cover_url"] = f"{base}/{track['cover']}" if track.get("cover") else None
         return out
+
+
+def download_name(title: str, ext: str) -> str:
+    """A safe file name for a download, e.g. 'Golden Hour Drive.mp3'."""
+    name = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', "", title or "").strip(" .") or "AI Jukebox song"
+    return f"{name[:80]}.{ext}"
+
+
+def tagged_audio(track: dict, folder: Path) -> bytes:
+    """The song's audio for download. MP3s get ID3 tags (title, genre, lyrics, cover art) so music
+    players show them; other formats are returned unchanged. The stored file is never modified."""
+    path = folder / track["audio"]
+    data = path.read_bytes()
+    if path.suffix.lower() != ".mp3":
+        return data
+    try:
+        from mutagen.id3 import APIC, COMM, ID3, TALB, TCON, TIT2, TPE1, USLT, ID3NoHeaderError
+    except ImportError:  # tagging is a nicety; the plain file still downloads
+        return data
+    buf = io.BytesIO(data)
+    try:
+        tags = ID3(buf)
+    except ID3NoHeaderError:
+        tags = ID3()
+    tags.add(TIT2(encoding=3, text=track.get("title") or "AI Jukebox song"))
+    tags.add(TPE1(encoding=3, text="AI Jukebox"))
+    tags.add(TALB(encoding=3, text="AI Jukebox"))
+    if track.get("style"):
+        tags.add(TCON(encoding=3, text=track["style"]))
+    if track.get("summary"):
+        tags.add(COMM(encoding=3, lang="eng", desc="", text=track["summary"]))
+    lyrics = normalize_lyrics(track.get("lyrics") or "")
+    if track.get("vocal") and lyrics:
+        tags.add(USLT(encoding=3, lang="eng", desc="", text=lyrics))
+    cover = folder / (track.get("cover") or "")
+    if track.get("cover") and cover.is_file():
+        tags.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=cover.read_bytes()))
+    buf.seek(0)
+    tags.save(buf)
+    return buf.getvalue()
