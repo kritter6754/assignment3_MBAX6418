@@ -423,7 +423,7 @@ The first 8 songs came in slowly, with gaps of up to about 50 s, before speeding
 
 The models themselves worked from the first live call. **The hard part was getting the app connected to the right class endpoints, with the right request formats and settings, on every computer that ran it.** A wrong endpoint always looks the same to a user: "it doesn't work". Here is how that problem showed up and what we changed:
 
-1. **Request formats (bug 3).** We started without the services' documentation. FLUX worked first time, but Chatterbox rejected the DJ's voice upload with HTTP 400 (wrong field names and model id). *Fix:* we read each service's published API description (`/openapi.json`) and confirmed every format with live calls.
+1. **Request formats (bug 3).** We started without the services' documentation. FLUX worked first time, but Chatterbox rejected the DJ's voice upload with HTTP 400 (wrong field names and model id). *Fix:* we read each service's published API description and confirmed every format with live calls.
 2. **URL shapes (bug 4).** The class endpoints file lists Chatterbox without `/v1`, but the speech service lives under `/v1`. *Fix:* the app normalises every URL, so it works with or without `/v1`, and it can read `class-endpoints.txt` directly.
 3. **Placeholder URLs (bug 5).** A deployment kept the `example.com` placeholders, and each request waited 3 minutes before failing. *Fix:* the app gives up after 10 s and names the host. Placeholders count as "not set". A startup check and `/api/status` show which services are reachable.
 4. **Wrong model names (bug 6).** An old model name produced an unexplained "HTTP 400". *Fix:* errors now include the service's own explanation, and the model settings are optional with correct defaults.
@@ -470,18 +470,18 @@ The full stress-test numbers are in [docs/stress-test.md](docs/stress-test.md).
 ## Design judgment
 
 **Important design choice: one `<audio>` element, prefetched DJ clips, and parallel cover and music generation.**
-- **One audio element:** the browser player plays songs and DJ clips one after another through a single HTML `<audio>` element. Music and speech therefore cannot overlap, by construction rather than by careful timing.
-- **Prefetched DJ clips:** as soon as a song starts, the app asks for the next DJ break (`POST /api/dj`). Qwen writes the script and Chatterbox speaks it while the song plays, which took about 4 s in our tests, so the clip is ready when the song ends.
-- **Parallel generation:** when a song is created, Qwen first plans it (1.2–3.5 s). FLUX then paints the cover (about 2–4 s) at the same time as ACE-Step composes the music, so the total time is set by the music alone: 8.3–22.0 s depending on length.
+- **One audio player:** We purposefully produced a simple interface for ease of use and functionality. The application plays everything through one audio player, so multiple tracks and the DJ can never overlap. The DJ's comments are prepared while the song is still playing so interaction is instantaneous. Another design choice is making the cover and the music at the same time to save time as well. The only thing we didn't add here was custom album cover production. In hindsight this would have been a unique feature to add, but at the same time we didn't want to extend the timing by too much. Although we didn't test for timing between custom and pre-made album covers, the team voted on pre-made for simplicity reasons. 
+- **Prefetched DJ clips:** As soon as a song starts, the app asks for the next DJ break. Before the break, Qwen writes the script and Chatterbox speaks it while the song plays, which took about 4 s in our tests, so the clip is ready when the song ends. The only thing was that DJ breaks were inconsistent in terms of length. Some were short (think sub 5 seconds), others were longer (hovering around 10 seconds). 
+- **Parallel generation:** when a song is created, Qwen first plans it (1.2–3.5 s). FLUX then paints the cover (about 2–4 s) at the same time as ACE-Step composes the music, so the total time is set by the music alone: 8.3–22.0 s depending on length of the requested generation. 
 
 *Evidence:*
 - In test 5 the queue played song, DJ, song, DJ, song automatically, never with two sounds at once, and each DJ break named both songs.
 - In test 8, 26 rapid clicks on skip, rewind and play/pause never produced overlapping audio.
 - The 40-song stress test finished 40/40 with no failures, with the app answering in about 9 ms while it worked.
 
-**Limitation or failure investigated: connecting to the correct endpoints.** This is the key problem described [above](#key-problem-connecting-to-the-correct-endpoints). The most instructive case came from a teammate's install. The app started but showed "Class-service settings are missing", and Generate returned `503 Service Unavailable` even though `.env` existed. We found that the voice URL had been named `SPEECH_BASE_URL` instead of `TTS_BASE_URL`. Renaming it, or dropping `class-endpoints.txt` into the folder, fixed it immediately.
+**Limitation or failure investigated: connecting to the correct endpoints.** One key problem we ran into when other individuals were deploying the application on their own machines via the zip was connecting to the class endpoints. This was the biggest functional deficit. Once the endpoints were connected correctly, the application worked well with minimal bugs. What we learned is that because the endpoints themselves cannot be stored on the GitHub repo (ours is public) the user had to independently download them on their local machine then manually connect them to the application. The manual piece, however, was easy to do with the assistance of AI coding platforms such as Claude Code. The key fix, which was quite simple, was dropping `class-endpoints.txt` into the folder, then allowing the terminal to run and connecting those endpoints. 
 
-*What we learned:* the fragile part of this app is not the AI models but the path to them. People write settings in different ways, and a wrong endpoint looks the same as a broken app. So we made the app:
+*Additional learning:* the fragile part of this app is not the AI models but the path to them. People write settings in different ways, and a wrong endpoint looks the same as a broken app. So we made the app:
 - accept the ways people actually write the settings;
 - check every service when it starts;
 - name the exact setting or host that is wrong, in the terminal and on the page.
