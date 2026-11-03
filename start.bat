@@ -11,8 +11,17 @@ if not exist .env (
   copy .env.example .env >nul
   echo Created .env from .env.example.
 )
+set NEEDKEY=0
 findstr /r /c:"^CLASS_API_KEY=replace-me" /c:"^CLASS_API_KEY= *$" .env >nul
-if !errorlevel! equ 0 (
+if !errorlevel! equ 0 set NEEDKEY=1
+if !NEEDKEY! equ 1 if exist class-endpoints.txt (
+  findstr /i /r /c:"^ *API Key *:" /c:"^ *CLASS_API_KEY *=" class-endpoints.txt >nul
+  if !errorlevel! equ 0 (
+    echo Using the API key from class-endpoints.txt.
+    set NEEDKEY=0
+  )
+)
+if !NEEDKEY! equ 1 (
   set /p KEY=Paste the class API key, then press Enter: 
   if "!KEY!"=="" (
     echo No key entered. Open .env, set CLASS_API_KEY=..., then run this again.

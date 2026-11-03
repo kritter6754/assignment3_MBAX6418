@@ -94,3 +94,44 @@ def test_short_keys_are_redacted():
     from jukebox.config import redact, register_secret
     register_secret("k9z4")
     assert redact("HTTP 401 for key k9z4") == "HTTP 401 for key ***"
+
+
+OFFICIAL_LAYOUT = """Class Model API Endpoints
+
+Hermes Primary Model — 9000
+Base URL: http://h:9000/v1
+API Key: key-for-9000
+Model: some/model
+
+Hermes Auxiliary Vision Model / Classification LLM — 9001
+Base URL: http://h:9001/v1
+API Key: shared-key-1
+Model: cyankiwi/Qwen
+
+Image Generation and Editing — 9006
+Base URL: http://h:9006/v1
+API Key: shared-key-1
+
+Music Generation — 9007
+Base URL: http://h:9007
+API Key: shared-key-1
+
+Text-to-Speech and Voice Cloning — 9008
+Base URL: http://h:9008
+API Key: shared-key-1
+Hugging Face: https://huggingface.co/ResembleAI/chatterbox
+
+Notes for agents
+- Chatterbox (9008): docs at http://h:9008/docs
+"""
+
+
+def test_official_class_file_layout(clean_env, tmp_path, capsys):
+    f = tmp_path / "class-endpoints.txt"
+    f.write_text(OFFICIAL_LAYOUT)
+    clean_env.setenv("CLASS_ENDPOINTS_FILE", str(f))
+    s = load_settings(env_file=tmp_path / "no.env")
+    assert (s.llm_url, s.image_url, s.music_url, s.tts_url) == (
+        "http://h:9001/v1", "http://h:9006/v1", "http://h:9007", "http://h:9008/v1")
+    assert s.api_key == "shared-key-1" and s.configured  # the 9000 block is ignored
+    assert "could not parse" not in capsys.readouterr().err

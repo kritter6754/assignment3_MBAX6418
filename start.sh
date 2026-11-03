@@ -11,7 +11,10 @@ if [ ! -f .env ]; then
   cp .env.example .env
   echo "Created .env from .env.example."
 fi
-if grep -qE '^CLASS_API_KEY=(replace-me)?[[:space:]]*$' .env; then
+if grep -qE '^CLASS_API_KEY=(replace-me)?[[:space:]]*$' .env \
+   && [ -f class-endpoints.txt ] && grep -qiE '^[[:space:]]*(api[ _-]?key[[:space:]]*[:=]|class_api_key[[:space:]]*=)' class-endpoints.txt; then
+  echo "Using the API key from class-endpoints.txt."
+elif grep -qE '^CLASS_API_KEY=(replace-me)?[[:space:]]*$' .env; then
   printf "Paste the class API key (it will not be shown), then press Enter: "
   read -rs KEY
   echo

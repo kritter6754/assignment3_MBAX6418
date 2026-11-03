@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from dotenv import dotenv_values, load_dotenv
+from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SAMPLES_DIR = PROJECT_ROOT / "assets" / "samples"
@@ -128,22 +128,48 @@ def apply_setting_aliases() -> None:
             os.environ[key] = value
 
 
-def load_endpoints_file(path: Path) -> None:
-    """Fill in settings from the class's class-endpoints.txt, if present in the project folder.
+def parse_endpoints_text(text: str) -> dict[str, str]:
+    """Read settings from the class endpoints file. Two layouts are understood:
 
-    Lowest priority: real environment variables and .env win. Accepts KEY=VALUE lines (spaces
-    around '=' are fine); URLs without a known key are matched to a service by their port.
+    * the official class file: one block per service with "Base URL: ..." and "API Key: ..."
+      lines (blocks for other ports, such as 9000, are ignored), and
+    * simple KEY=VALUE lines (spaces around '=' are fine).
+
+    URLs are matched to a service by their port. The key is taken from the blocks of the
+    services this app uses (9001, 9006, 9007, 9008).
     """
-    if not path.is_file():
-        return
-    text = path.read_text(errors="replace")
-    values = {k.strip().upper(): (v or "").strip() for k, v in dotenv_values(path).items() if k}
+    values: dict[str, str] = {}
+    for line in text.splitlines():
+        m = re.match(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$", line)
+        if m and m.group(2):
+            values[m.group(1).upper()] = m.group(2).strip().strip("\"'")
     if "API_KEY" in values and "CLASS_API_KEY" not in values:
         values["CLASS_API_KEY"] = values["API_KEY"]
-    for url, port in re.findall(r"(https?://[^\s\"'<>]+?:(\d{4,5})[^\s\"'<>]*)", text):
-        key = ENV_FOR_PORT.get(int(port))
-        if key and not values.get(key):
-            values[key] = url
+    keys_for_our_ports: list[str] = []
+    for block in re.split(r"\n\s*\n", text):
+        ours = False
+        for url in re.finditer(r"https?://[^\s\"'<>]+?:(\d{4,5})[^\s\"'<>]*", block):
+            name = ENV_FOR_PORT.get(int(url.group(1)))
+            if name:
+                ours = True
+                if not values.get(name):
+                    values[name] = url.group(0)
+        if not ours:
+            continue  # e.g. the 9000 (Hermes) block: neither its URL nor its key is used
+        key = re.search(r"api[ _-]?key\s*[:=]\s*(\S+)", block, flags=re.I)
+        if key:
+            keys_for_our_ports.append(key.group(1).strip("\"'"))
+    if not values.get("CLASS_API_KEY") and keys_for_our_ports:
+        values["CLASS_API_KEY"] = keys_for_our_ports[0]
+    return values
+
+
+def load_endpoints_file(path: Path) -> None:
+    """Fill in settings from the class's class-endpoints.txt, if present in the project folder.
+    Lowest priority: real environment variables and .env win."""
+    if not path.is_file():
+        return
+    values = parse_endpoints_text(path.read_text(errors="replace"))
     for key in ("CLASS_API_KEY", *ENV_FOR_PORT.values()):
         if not _placeholder(values.get(key)) and _placeholder(os.environ.get(key)):
             os.environ[key] = values[key]

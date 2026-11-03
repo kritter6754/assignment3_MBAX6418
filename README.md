@@ -21,7 +21,7 @@ No paid services are used, and port 9000 is not used.
 3. **Start it with the launcher:**
    - macOS / Linux: open a terminal in the folder and run `bash start.sh`
    - Windows: double-click `start.bat`
-4. **Paste the class API key** when the launcher asks. This happens only on the first run; the key is saved in `.env` and never uploaded.
+4. **The key.** The official `class-endpoints.txt` already contains the API key, so the launcher uses it and asks nothing. If your copy has no key, the launcher asks you to paste it once and saves it in `.env`. Neither file is ever uploaded.
 5. The launcher installs everything (about a minute the first time), checks the four class services, and **opens http://localhost:8000**. The terminal should show four `OK` lines.
 
 To stop the app press **Ctrl+C** in the terminal. To start it again, run the launcher again; it remembers the key and starts in seconds. Your songs and playlists are kept in `data/`.
@@ -78,7 +78,7 @@ Launching *runs* the app. Configuration *tells* the app which class services to 
 2. `.env` in the project folder.
 3. `class-endpoints.txt` in the project folder.
 
-The easiest setup is to put the key in `.env` (the launcher does this for you) and drop in the class's `class-endpoints.txt` for the four URLs.
+**The easiest setup is to drop the class's `class-endpoints.txt` into the folder.** The app reads the official file's layout: one block per service with `Base URL:` and `API Key:` lines. From it the app takes the URLs for ports 9001, 9006, 9007 and 9008 and the key from those blocks, and ignores everything else (for example the 9000 Hermes block). Simple `KEY=value` lines work too. To use a different key, set `CLASS_API_KEY` in `.env`; it takes priority.
 
 **The app forgives common mistakes:**
 - URLs work with or without a trailing `/v1`, and spaces around values are ignored.
@@ -107,7 +107,28 @@ TTS_BASE_URL=http://example.com:9008/v1
 # APP_PASSWORD=          # ask for a password before using the app
 ```
 
-**Example `class-endpoints.txt`** (the format of the class file; placeholders):
+**Example `class-endpoints.txt`** (the official layout, shortened, with placeholders):
+
+```text
+Hermes Auxiliary Vision Model / Classification LLM — 9001
+Base URL: http://example.com:9001/v1
+API Key: replace-me
+Model: cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit
+
+Image Generation and Editing — 9006
+Base URL: http://example.com:9006/v1
+API Key: replace-me
+
+Music Generation — 9007
+Base URL: http://example.com:9007
+API Key: replace-me
+
+Text-to-Speech and Voice Cloning — 9008
+Base URL: http://example.com:9008
+API Key: replace-me
+```
+
+A short `KEY=value` version also works:
 
 ```ini
 LLM_BASE_URL= http://example.com:9001/v1
@@ -397,11 +418,13 @@ The models themselves worked from the first live call. **The hard part was getti
 4. **Wrong model names (bug 6).** An old model name produced an unexplained "HTTP 400". *Fix:* errors now include the service's own explanation, and the model settings are optional with correct defaults.
 5. **A misleading startup check (bug 10).** A wrong key was reported as a URL problem, and ACE-Step looked OK even with a bad key. *Fix:* each failure now gets a hint that matches its cause, and ACE-Step is checked through an address that requires the key.
 6. **Different setting names (bug 14).** A teammate installing from GitHub named the voice URL `SPEECH_BASE_URL`, and the app switched generation off with only a vague message. *Fix:* the app accepts common alternative names, matches unknown `…_URL` settings by port, and names any missing setting in the banner and the terminal.
+7. **The official endpoints file (bug 15).** When we placed the official class file into a fresh ZIP folder, the app found the four URLs but printed about 80 "could not parse" warnings at startup and ignored the file's `API Key:` lines, so a key had to be typed in separately. *Fix:* the app reads the official layout directly, takes the key from the blocks of the services it uses, and prints no warnings. The launchers no longer ask for a key the file already provides.
 
 **Evidence that it is solved:**
 - Fresh installs from the GitHub ZIP connected first time with uv and with pip (tests 18–19).
 - A wrong key and an unreachable host both produce clear errors within 10 s (tests 11–12).
 - The teammate's original `.env` now works unchanged.
+- The official class file alone (no `.env` edits) configures all four services and the key.
 
 ### Problem log (every problem found; all fixed)
 
@@ -423,6 +446,7 @@ Each problem below was found by running the app against the live class services,
 | 12 | **Technical error wording** for invalid input, such as "String should have at least 1 character". | Requirement test (test 13) | The web framework's default validation messages were passed through unchanged. | Messages now say what to fix, e.g. "Choose a style (up to 80 characters)." |
 | 13 | **A missing period in the DJ error message** ("…retry in a moment Continuing to the next song"). | Requirement test (test 10) | The message was joined without punctuation. | Punctuation is added when missing. |
 | 14 | **Generation and the DJ switched off after a teammate's setup**, with only "Class-service settings are missing" and `503` on Generate. | A teammate installing from GitHub | They named the voice URL `SPEECH_BASE_URL` in `.env`. The app only knew `TTS_BASE_URL`, and its message did not say which setting was missing. | The app now accepts common alternative names (`SPEECH_BASE_URL`, `VOICE_BASE_URL`, `FLUX_BASE_URL`, `QWEN_BASE_URL`, `ACESTEP_BASE_URL`, `API_KEY`, …) and matches any other `…_URL` setting to its service by port. The red banner and the terminal now list the exact settings that are missing and where to put them. Retested with the teammate's `.env`. |
+| 15 | **The official class endpoints file printed ~80 "could not parse" warnings, and its key was ignored.** | Preparing a fresh ZIP folder with the official `class-endpoints.txt` | That file is a list of service blocks ("Base URL:", "API Key:" lines), but the app read it as `KEY=value` lines. URLs were still found by port; the key was not. | The app parses the official layout, takes the key from the 9001/9006/9007/9008 blocks, and prints no warnings. The launchers skip the key prompt when the file has a key. Tested with the real file. |
 
 ### Known limitations (not fixed)
 
