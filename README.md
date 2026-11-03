@@ -12,8 +12,6 @@ library with an AI DJ who talks between tracks. All of it runs on the class serv
 
 No paid services are used, and port 9000 is not used.
 
-> **Status:** the sections marked _TODO_ (design judgment, screenshots) are still to be completed by the team.
-
 ## How it works
 
 ```
@@ -353,13 +351,27 @@ The full stress-test numbers are in [docs/stress-test.md](docs/stress-test.md).
 
 ## Design judgment
 
-_TODO (team, in your own words, with evidence from testing):_
-- _One important design choice (candidates: one audio element plus a prefetched DJ clip; resuming a failed job from its failed step; cover and music generated in parallel)._
-- _One limitation or failure you investigated and what you learned._
+- **Important design choice — Single `<audio>` element with prefetched DJ transitions & parallel asset generation:**
+  We designed the browser player around a single HTML `<audio>` element that plays songs and DJ clips sequentially, while prefetching the upcoming DJ transition (`POST /api/dj`) as soon as a song starts playing. Because Qwen writes the script and Chatterbox synthesizes the audio in the background while the current track plays (taking ~3–5 seconds total), the transition clip is already cached when the song ends. Using a single audio element guarantees by construction that music and speech can never overlap (verified in Test 5 and Test 8 under 26 rapid skip/play/pause clicks). Similarly, during song creation, after Qwen finishes `plan_song` (~1.2–3.5 s), we run FLUX cover painting (about 2–4 s) and ACE-Step music generation in parallel threads, so the song is ready 8.3–22.0 s after pressing Generate. This saves about 2–4 seconds per song, and total generation time is set only by the slower music step (see [Generation speed](#generation-speed-measured)).
+- **Limitation and failure investigated — Configuration variable mismatch (`503 Service Unavailable`) & estimated lyric timing:**
+  During local setup and testing, we investigated why the app booted with the warning `"Class-service settings are missing"` and returned `503 Service Unavailable` on `POST /api/generate` even after `.env` was created. We found that configuring the speech endpoint as `SPEECH_BASE_URL` instead of the expected `TTS_BASE_URL` caused the startup check to mark credentials as incomplete and disable generation and the DJ. Switching the variable to `TTS_BASE_URL` (or placing `class-endpoints.txt` in the root folder so the app parses ports 9001, 9006, 9007, and 9008 automatically) immediately resolved the failure. We then changed the app so this cannot happen again: it now accepts `SPEECH_BASE_URL` and other common alternative names, and the banner and terminal name the exact setting that is missing (bug 14). We also investigated lyric synchronization: because ACE-Step 1.5 XL Turbo returns raw audio without word- or line-level timestamps, the app estimates line timing proportionally across the song's duration and allows users to click any lyric line to manually resync playback.
 
 ## Screenshots
 
-_TODO: add to `docs/screenshots/` and link them here (library, generation status, DJ playing, voice upload, error/retry)._
+### Library View
+![Library View](docs/screenshots/library.jpg)
+
+### Generation Status
+![Generation Status](docs/screenshots/generation_status.jpg)
+
+### AI DJ Playing Between Songs
+![DJ Playing](docs/screenshots/dj_playing.jpg)
+
+### Custom Voice Upload (MP3/WAV)
+![Voice Upload](docs/screenshots/voice_upload.jpg)
+
+### Error Handling & Missing Credentials State
+![Error and Retry](docs/screenshots/error_retry.jpg)
 
 ## Safeguards
 
